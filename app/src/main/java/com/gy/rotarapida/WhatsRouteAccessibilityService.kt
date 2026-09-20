@@ -64,7 +64,22 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         Prefs.setStatus(this, "Serviço de acessibilidade conectado.")
+        warmUpRecognizer()
         handler.postDelayed({ primeCurrentScreen() }, 350)
+    }
+
+    private fun warmUpRecognizer() {
+        try {
+            val tiny = Bitmap.createBitmap(48, 48, Bitmap.Config.ARGB_8888)
+            val input = InputImage.fromBitmap(tiny, 0)
+
+            recognizer.process(input)
+                .addOnCompleteListener {
+                    tiny.recycle()
+                }
+        } catch (_: Throwable) {
+            // O aquecimento é opcional; o OCR real ainda tentará normalmente.
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -315,113 +330,256 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     private fun captureAndReadImage(attempt: Int) {
         if (!processing) return
 
-        takeScreenshot(
-            Display.DEFAULT_DISPLAY,
-            mainExecutor,
-            object : TakeScreenshotCallback {
-                override fun onSuccess(screenshot: ScreenshotResult) {
-                    val hardwareBuffer = screenshot.hardwareBuffer
+        Prefs.setStatus(
+            this,
+            if (attempt == 0)
+                "Imagem aberta. Capturando a tela para OCR..."
+            else
+                "Segunda leitura da imagem..."
+        )
 
-                    val wrapped = Bitmap.wrapHardwareBuffer(
-                        hardwareBuffer,
-                        screenshot.colorSpace
-                    )
+        var screenshotAnswered = false
 
-                    val bitmap = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
-                    hardwareBuffer.close()
+        val screenshotTimeout = Runnable {
+            if (processing && !screenshotAnswered) {
+                imageFailed(
+                    "A captura da tela não respondeu. Fechei a imagem para não travar."
+                )
+            }
+        }
 
-                    if (bitmap == null) {
-                        imageFailed("Não consegui converter a captura da imagem.")
-                        return
-                    }
+        handler.postDelayed(screenshotTimeout, 1_500L)
 
-                    val ocrBitmap = prepararBitmapImagemParaOcr(
-                        bitmap = bitmap,
-                        attempt = attempt
-                    )
+        try {
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                mainExecutor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        screenshotAnswered = true
+                        handler.removeCallbacks(screenshotTimeout)
 
-                    val input = InputImage.fromBitmap(ocrBitmap, 0)
+                        if (!processing) {
+                            try {
+                                screenshot.hardwareBuffer.close()
+                            } catch (_: Throwable) {}
+                            return
+                        }
 
-                    recognizer.process(input)
-                        .addOnSuccessListener { visionText ->
-                            val route = parseVisionText(
-                                visionText,
-                                ocrBitmap.height
+                        try {
+                            val hardwareBuffer = screenshot.hardwareBuffer
+
+                            val wrapped = Bitmap.wrapHardwareBuffer(
+                                hardwareBuffer,
+                                screenshot.colorSpace
                             )
 
-                            val totalLinhas = contarLinhasVisionText(visionText)
-                            val amostra = resumirVisionText(visionText)
+                            val bitmap = wrapped?.copy(
+                                Bitmap.Config.ARGB_8888,
+                                false
+                            )
 
-                            if (ocrBitmap !== bitmap) {
-                                ocrBitmap.recycle()
+                            hardwareBuffer.close()
+
+                            if (bitmap == null) {
+                                imageFailed(
+                                    "A captura abriu, mas não consegui transformar a tela em imagem."
+                                )
+                                return
                             }
-                            bitmap.recycle()
 
-                            if (route != null) {
-                                if (isDuplicate(route)) {
-                                    closeImageWithoutSending("Imagem repetida ignorada.")
-                                } else {
-                                    Prefs.setStatus(
-                                        this@WhatsRouteAccessibilityService,
-                                        "Imagem: ${route.neighborhood} -> ${route.cage}. Voltando ao grupo..."
-                                    )
+                            val ocrBitmap = prepararBitmapImagemParaOcr(
+                                bitmap = bitmap,
+                                attempt = attempt
+                            )
 
-                                    performGlobalAction(GLOBAL_ACTION_BACK)
-                                    handler.postDelayed(
-                                        { sendRouteWhenChatReady(route, 0) },
-                                        40L
+                            val input = InputImage.fromBitmap(ocrBitmap, 0)
+
+                            Prefs.setStatus(
+                                this@WhatsRouteAccessibilityService,
+                                if (attempt == 0)
+                                    "Tela capturada. OCR lendo..."
+                                else
+                                    "Imagem reforçada. OCR lendo novamente..."
+                            )
+
+                            var ocrAnswered = false
+
+                            val ocrTimeout = Runnable {
+                                if (processing && !ocrAnswered) {
+                                    try {
+                                        if (ocrBitmap !== bitmap) {
+                                            ocrBitmap.recycle()
+                                        }
+                                        bitmap.recycle()
+                                    } catch (_: Throwable) {}
+
+                                    imageFailed(
+                                        "O OCR demorou demais e foi interrompido."
                                     )
                                 }
-                            } else if (attempt == 0) {
-                                Prefs.setStatus(
-                                    this@WhatsRouteAccessibilityService,
-                                    "OCR imagem 1: $totalLinhas linhas, sem rota. " +
-                                        "Reforçando imagem e tentando de novo..."
-                                )
-
-                                handler.postDelayed(
-                                    { captureAndReadImage(attempt = 1) },
-                                    IMAGE_RETRY_DELAY_MS
-                                )
-                            } else {
-                                closeImageWithoutSending(
-                                    if (totalLinhas == 0)
-                                        "OCR da imagem não conseguiu ler nenhum texto."
-                                    else
-                                        "OCR imagem leu $totalLinhas linhas, mas não fechou a rota. " +
-                                            "Amostra: $amostra"
-                                )
                             }
+
+                            handler.postDelayed(ocrTimeout, 4_000L)
+
+                            recognizer.process(input)
+                                .addOnSuccessListener { visionText ->
+                                    if (ocrAnswered) return@addOnSuccessListener
+                                    ocrAnswered = true
+                                    handler.removeCallbacks(ocrTimeout)
+
+                                    if (!processing) {
+                                        try {
+                                            if (ocrBitmap !== bitmap) {
+                                                ocrBitmap.recycle()
+                                            }
+                                            bitmap.recycle()
+                                        } catch (_: Throwable) {}
+                                        return@addOnSuccessListener
+                                    }
+
+                                    val route = parseVisionText(
+                                        visionText,
+                                        ocrBitmap.height
+                                    )
+
+                                    val totalLinhas =
+                                        contarLinhasVisionText(visionText)
+                                    val amostra =
+                                        resumirVisionText(visionText)
+
+                                    try {
+                                        if (ocrBitmap !== bitmap) {
+                                            ocrBitmap.recycle()
+                                        }
+                                        bitmap.recycle()
+                                    } catch (_: Throwable) {}
+
+                                    if (route != null) {
+                                        if (isDuplicate(route)) {
+                                            closeImageWithoutSending(
+                                                "Imagem repetida ignorada."
+                                            )
+                                        } else {
+                                            Prefs.setStatus(
+                                                this@WhatsRouteAccessibilityService,
+                                                "Imagem: ${route.neighborhood} -> ${route.cage}. Voltando ao grupo..."
+                                            )
+
+                                            performGlobalAction(
+                                                GLOBAL_ACTION_BACK
+                                            )
+
+                                            handler.postDelayed(
+                                                {
+                                                    sendRouteWhenChatReady(
+                                                        route,
+                                                        0
+                                                    )
+                                                },
+                                                40L
+                                            )
+                                        }
+                                    } else if (attempt == 0) {
+                                        Prefs.setStatus(
+                                            this@WhatsRouteAccessibilityService,
+                                            "OCR 1 leu $totalLinhas linhas. Tentando leitura reforçada..."
+                                        )
+
+                                        handler.postDelayed(
+                                            {
+                                                captureAndReadImage(
+                                                    attempt = 1
+                                                )
+                                            },
+                                            IMAGE_RETRY_DELAY_MS
+                                        )
+                                    } else {
+                                        closeImageWithoutSending(
+                                            if (totalLinhas == 0) {
+                                                "OCR não conseguiu ler texto na imagem."
+                                            } else {
+                                                "OCR leu $totalLinhas linhas, mas não achou rota. Amostra: $amostra"
+                                            }
+                                        )
+                                    }
+                                }
+                                .addOnFailureListener { error ->
+                                    if (ocrAnswered) return@addOnFailureListener
+                                    ocrAnswered = true
+                                    handler.removeCallbacks(ocrTimeout)
+
+                                    try {
+                                        if (ocrBitmap !== bitmap) {
+                                            ocrBitmap.recycle()
+                                        }
+                                        bitmap.recycle()
+                                    } catch (_: Throwable) {}
+
+                                    if (!processing) {
+                                        return@addOnFailureListener
+                                    }
+
+                                    if (attempt == 0) {
+                                        handler.postDelayed(
+                                            {
+                                                captureAndReadImage(
+                                                    attempt = 1
+                                                )
+                                            },
+                                            IMAGE_RETRY_DELAY_MS
+                                        )
+                                    } else {
+                                        imageFailed(
+                                            "Erro no OCR: ${error.message ?: "sem detalhes"}"
+                                        )
+                                    }
+                                }
+                        } catch (error: Throwable) {
+                            imageFailed(
+                                "Erro ao preparar a imagem: " +
+                                    (error.message ?: error.javaClass.simpleName)
+                            )
                         }
-                        .addOnFailureListener { error ->
-                            if (ocrBitmap !== bitmap) {
-                                ocrBitmap.recycle()
-                            }
-                            bitmap.recycle()
+                    }
 
-                            if (attempt == 0) {
-                                handler.postDelayed(
-                                    { captureAndReadImage(attempt = 1) },
-                                    IMAGE_RETRY_DELAY_MS
-                                )
-                            } else {
-                                imageFailed("Erro no OCR: ${error.message}")
-                            }
+                    override fun onFailure(errorCode: Int) {
+                        screenshotAnswered = true
+                        handler.removeCallbacks(screenshotTimeout)
+
+                        if (!processing) return
+
+                        if (attempt == 0) {
+                            Prefs.setStatus(
+                                this@WhatsRouteAccessibilityService,
+                                "Captura falhou ($errorCode). Tentando novamente..."
+                            )
+
+                            handler.postDelayed(
+                                {
+                                    captureAndReadImage(
+                                        attempt = 1
+                                    )
+                                },
+                                IMAGE_RETRY_DELAY_MS
+                            )
+                        } else {
+                            imageFailed(
+                                "Falha ao capturar a tela. Código: $errorCode"
+                            )
                         }
-                }
-
-                override fun onFailure(errorCode: Int) {
-                    if (attempt == 0) {
-                        handler.postDelayed(
-                            { captureAndReadImage(attempt = 1) },
-                            IMAGE_RETRY_DELAY_MS
-                        )
-                    } else {
-                        imageFailed("Falha ao capturar a tela. Código: $errorCode")
                     }
                 }
-            }
-        )
+            )
+        } catch (error: Throwable) {
+            screenshotAnswered = true
+            handler.removeCallbacks(screenshotTimeout)
+
+            imageFailed(
+                "Erro ao pedir captura da tela: " +
+                    (error.message ?: error.javaClass.simpleName)
+            )
+        }
     }
 
     private fun prepararBitmapImagemParaOcr(
@@ -431,8 +589,6 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         val w = bitmap.width
         val h = bitmap.height
 
-        // Retira principalmente barra superior e controles inferiores do
-        // visualizador. A tabela permanece inteira na largura.
         val top = (h * 0.07f).toInt().coerceAtLeast(0)
         val bottom = (h * 0.08f).toInt().coerceAtLeast(0)
         val cropHeight = (h - top - bottom).coerceAtLeast(1)
@@ -445,10 +601,22 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             cropHeight
         )
 
-        // O problema no M52 é que a tabela aberta fica legível ao olho,
-        // mas o texto é pequeno para o ML Kit. Em vez de dar zoom físico
-        // (que poderia cortar a coluna Bairro), ampliamos a captura inteira.
-        val scale = if (attempt == 0) 1.60f else 2.10f
+        val wantedScale = if (attempt == 0) 1.35f else 1.65f
+
+        // Evita criar bitmaps gigantes no M52.
+        val maxDimension = 2_600f
+        val biggest = maxOf(cropped.width, cropped.height).toFloat()
+        val maxAllowedScale =
+            if (biggest > 0f) maxDimension / biggest else 1f
+
+        val scale = minOf(
+            wantedScale,
+            maxAllowedScale.coerceAtLeast(1f)
+        )
+
+        if (scale <= 1.01f) {
+            return cropped
+        }
 
         val scaled = Bitmap.createScaledBitmap(
             cropped,
@@ -918,6 +1086,9 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
 
     private fun imageFingerprint(item: NodeItem): String =
         buildString {
+            // IMPORTANTE: não usar hashCode() do AccessibilityNodeInfo aqui.
+            // O WhatsApp recria os nós quando a tela muda e a mesma foto
+            // acabava parecendo uma "nova" imagem depois de voltar ao grupo.
             append(item.className)
             append('|')
             append(RouteParser.normalize(item.text))
@@ -929,8 +1100,6 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             append(item.rect.right)
             append(',')
             append(item.rect.bottom)
-            append('|')
-            append(item.node.hashCode())
         }
 
     private fun textSignatures(items: List<NodeItem>): Set<String> =

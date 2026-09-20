@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Rota Rápida"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Teste Android: lê rota em texto direto da tela e usa OCR local para rota em imagem."
+            android:textSize="15sp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:hint="Nome exato do grupo do WhatsApp">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/editGroupName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Button
+            android:id="@+id/buttonSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Salvar grupo" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switchEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Automação ativa" />
+
+        <Button
+            android:id="@+id/buttonAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Abrir Acessibilidade do Android" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Status"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Aguardando configuração."
+            android:textIsSelectable="true"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Prioridade"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="1. Valparaiso&#10;2. Colina de Laranjeiras&#10;3. Praia da Baleia&#10;4. Morada de Laranjeiras&#10;5. Eurico&#10;6. Manoel Plaza&#10;7. Rosario&#10;8. Helio Ferraz&#10;9. Parque Residencial Laranjeiras&#10;10. Barcelona&#10;11. Maringa"
+            android:textSize="14sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="Mensagem enviada:&#10;Felipe lima de Castilho&#10;1347515&#10;Passeio&#10;Gaiola: g03"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+</ScrollView>

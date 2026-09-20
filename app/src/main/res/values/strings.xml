@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Rota Rápida</string>
+    <string name="service_name">Rota Rápida — WhatsApp</string>
+    <string name="accessibility_description">Lê a rota aberta no WhatsApp, identifica o bairro prioritário e envia automaticamente a gaiola configurada.</string>
+</resources>

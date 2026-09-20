@@ -30,7 +30,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         // podemos reduzir esse valor.
         private const val IMAGE_OPEN_DELAY_MS = 140L
 
-        private const val IMAGE_RETRY_DELAY_MS = 380L
+        private const val IMAGE_RETRY_DELAY_MS = 180L
         private const val SEND_BUTTON_DELAY_MS = 18L
         private const val DEDUP_MS = 8_000L
     }
@@ -304,8 +304,11 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             return
         }
 
-        Prefs.setStatus(this, "Imagem aberta. Fazendo OCR...")
-        captureAndReadImage(attempt)
+        Prefs.setStatus(this, "Imagem aberta. Preparando OCR...")
+        handler.postDelayed(
+            { captureAndReadImage(attempt) },
+            70L
+        )
     }
 
 
@@ -332,15 +335,26 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                         return
                     }
 
-                    val input = InputImage.fromBitmap(bitmap, 0)
+                    val ocrBitmap = prepararBitmapImagemParaOcr(
+                        bitmap = bitmap,
+                        attempt = attempt
+                    )
+
+                    val input = InputImage.fromBitmap(ocrBitmap, 0)
 
                     recognizer.process(input)
                         .addOnSuccessListener { visionText ->
                             val route = parseVisionText(
                                 visionText,
-                                bitmap.height
+                                ocrBitmap.height
                             )
 
+                            val totalLinhas = contarLinhasVisionText(visionText)
+                            val amostra = resumirVisionText(visionText)
+
+                            if (ocrBitmap !== bitmap) {
+                                ocrBitmap.recycle()
+                            }
                             bitmap.recycle()
 
                             if (route != null) {
@@ -361,7 +375,8 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                             } else if (attempt == 0) {
                                 Prefs.setStatus(
                                     this@WhatsRouteAccessibilityService,
-                                    "Primeiro OCR da imagem não fechou a rota. Tentando mais uma vez..."
+                                    "OCR imagem 1: $totalLinhas linhas, sem rota. " +
+                                        "Reforçando imagem e tentando de novo..."
                                 )
 
                                 handler.postDelayed(
@@ -370,11 +385,18 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                                 )
                             } else {
                                 closeImageWithoutSending(
-                                    "Imagem lida, mas não encontrei bairro prioritário + gaiola."
+                                    if (totalLinhas == 0)
+                                        "OCR da imagem não conseguiu ler nenhum texto."
+                                    else
+                                        "OCR imagem leu $totalLinhas linhas, mas não fechou a rota. " +
+                                            "Amostra: $amostra"
                                 )
                             }
                         }
                         .addOnFailureListener { error ->
+                            if (ocrBitmap !== bitmap) {
+                                ocrBitmap.recycle()
+                            }
                             bitmap.recycle()
 
                             if (attempt == 0) {
@@ -401,6 +423,84 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             }
         )
     }
+
+    private fun prepararBitmapImagemParaOcr(
+        bitmap: Bitmap,
+        attempt: Int
+    ): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+
+        // Retira principalmente barra superior e controles inferiores do
+        // visualizador. A tabela permanece inteira na largura.
+        val top = (h * 0.07f).toInt().coerceAtLeast(0)
+        val bottom = (h * 0.08f).toInt().coerceAtLeast(0)
+        val cropHeight = (h - top - bottom).coerceAtLeast(1)
+
+        val cropped = Bitmap.createBitmap(
+            bitmap,
+            0,
+            top,
+            w,
+            cropHeight
+        )
+
+        // O problema no M52 é que a tabela aberta fica legível ao olho,
+        // mas o texto é pequeno para o ML Kit. Em vez de dar zoom físico
+        // (que poderia cortar a coluna Bairro), ampliamos a captura inteira.
+        val scale = if (attempt == 0) 1.60f else 2.10f
+
+        val scaled = Bitmap.createScaledBitmap(
+            cropped,
+            (cropped.width * scale).toInt().coerceAtLeast(1),
+            (cropped.height * scale).toInt().coerceAtLeast(1),
+            true
+        )
+
+        if (scaled !== cropped) {
+            cropped.recycle()
+        }
+
+        return scaled
+    }
+
+    private fun contarLinhasVisionText(visionText: Text): Int =
+        visionText.textBlocks.sumOf { it.lines.size }
+
+    private fun resumirVisionText(visionText: Text): String {
+        val linhas = visionText.textBlocks
+            .flatMap { it.lines }
+            .map { it.text.trim() }
+            .filter { it.isNotBlank() }
+
+        if (linhas.isEmpty()) {
+            return "nenhum texto"
+        }
+
+        val prioridade = linhas.firstOrNull { linha ->
+            val n = RouteParser.normalize(linha)
+            listOf(
+                "valparaiso",
+                "colina",
+                "baleia",
+                "morada",
+                "eurico",
+                "plaza",
+                "rosario",
+                "helio",
+                "ferraz",
+                "barcelona",
+                "maringa"
+            ).any { it in n }
+        }
+
+        val amostra = prioridade ?: linhas.takeLast(3).joinToString(" | ")
+
+        return amostra
+            .replace("\n", " ")
+            .take(120)
+    }
+
 
     private fun parseVisionText(
         visionText: Text,

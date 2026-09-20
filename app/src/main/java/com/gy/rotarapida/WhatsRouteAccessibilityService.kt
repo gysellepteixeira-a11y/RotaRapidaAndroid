@@ -52,7 +52,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     private var primed = false
 
     private var previousTexts: Set<String> = emptySet()
-    private var lastImageFingerprint = ""
+    private var previousImageFingerprints: Set<String> = emptySet()
     private var imageHintUntil = 0L
 
     private var lastSentSignature = ""
@@ -102,7 +102,9 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         val items = collectNodeItems(root)
 
         previousTexts = textSignatures(items)
-        lastImageFingerprint = findImageCandidate(items)?.let(::imageFingerprint).orEmpty()
+        previousImageFingerprints = findImageCandidates(items)
+            .map(::imageFingerprint)
+            .toSet()
         primed = true
     }
 
@@ -120,16 +122,24 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
 
         if (!isTargetGroup(items, group)) {
             previousTexts = textSignatures(items)
-            lastImageFingerprint = findImageCandidate(items)?.let(::imageFingerprint).orEmpty()
+            previousImageFingerprints = findImageCandidates(items)
+                .map(::imageFingerprint)
+                .toSet()
             primed = true
             return
         }
 
         val currentSignatures = textSignatures(items)
+        val currentImageCandidates = findImageCandidates(items)
+        val currentImageFingerprints = currentImageCandidates
+            .map(::imageFingerprint)
+            .toSet()
 
         if (!primed) {
             previousTexts = currentSignatures
-            lastImageFingerprint = findImageCandidate(items)?.let(::imageFingerprint).orEmpty()
+            previousImageFingerprints = findImageCandidates(items)
+                .map(::imageFingerprint)
+                .toSet()
             primed = true
             Prefs.setStatus(this, "Grupo confirmado. Aguardando uma nova rota.")
             return
@@ -161,6 +171,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                 ?: RouteParser.parsePlainTexts(newItems.map { it.text })
 
         if (textRoute != null && !isDuplicate(textRoute)) {
+            previousImageFingerprints = currentImageFingerprints
             currentStartedAt = SystemClock.elapsedRealtime()
             processing = true
             Prefs.setStatus(
@@ -172,35 +183,49 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         }
 
         // ---------------- IMAGEM ----------------
-        if (SystemClock.elapsedRealtime() <= imageHintUntil) {
-            val candidate = findImageCandidate(items)
-            if (candidate != null) {
-                val fingerprint = imageFingerprint(candidate)
-
-                if (fingerprint != lastImageFingerprint) {
-                    lastImageFingerprint = fingerprint
-                    currentStartedAt = SystemClock.elapsedRealtime()
-                    processing = true
-
-                    Prefs.setStatus(this, "Nova imagem detectada. Abrindo...")
-
-                    if (clickNodeOrParent(candidate.node)) {
-                        handler.postDelayed(
-                            { captureAndReadImage(attempt = 0) },
-                            IMAGE_OPEN_DELAY_MS
-                        )
-                    } else {
-                        processing = false
-                        Prefs.setStatus(this, "Imagem detectada, mas não consegui abrir.")
-                    }
-                    return
-                }
-            }
+        //
+        // v0.2:
+        // No M52 o WhatsApp não expôs a miniatura com o texto "foto/imagem".
+        // Por isso não dependemos mais do imageHintUntil.
+        //
+        // Agora detectamos também um NOVO bloco visual grande, sem texto,
+        // dentro da região da conversa. Isso cobre miniaturas expostas como
+        // android.view.View / FrameLayout, algo comum no WhatsApp/Samsung.
+        val newImageCandidates = currentImageCandidates.filter { candidate ->
+            imageFingerprint(candidate) !in previousImageFingerprints
         }
 
-        // Mantém a referência atual das imagens sem clicar em imagem antiga.
-        findImageCandidate(items)?.let {
-            lastImageFingerprint = imageFingerprint(it)
+        val candidate = newImageCandidates.maxWithOrNull(
+            compareBy<NodeItem>(
+                { imageCandidateScore(it) },
+                { it.rect.bottom }
+            )
+        )
+
+        // Atualiza a referência ANTES de qualquer clique.
+        previousImageFingerprints = currentImageFingerprints
+
+        if (candidate != null) {
+            currentStartedAt = SystemClock.elapsedRealtime()
+            processing = true
+
+            val hintAtivo = SystemClock.elapsedRealtime() <= imageHintUntil
+            Prefs.setStatus(
+                this,
+                "Imagem detectada${if (hintAtivo) " (hint)" else ""}. Abrindo..."
+            )
+
+            if (clickNodeOrParent(candidate.node)) {
+                handler.postDelayed(
+                    { captureAndReadImage(attempt = 0) },
+                    IMAGE_OPEN_DELAY_MS
+                )
+            } else {
+                processing = false
+                Prefs.setStatus(this, "Imagem detectada, mas não consegui abrir.")
+                handler.postDelayed({ primeCurrentScreen() }, 100L)
+            }
+            return
         }
     }
 
@@ -573,7 +598,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             )
     }
 
-    private fun findImageCandidate(items: List<NodeItem>): NodeItem? {
+    private fun findImageCandidates(items: List<NodeItem>): List<NodeItem> {
         val screenWidth = resources.displayMetrics.widthPixels
         val screenHeight = resources.displayMetrics.heightPixels
 
@@ -582,43 +607,154 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             "avatar",
             "emoji",
             "camera",
-            "camera",
             "anexar",
-            "sticker"
+            "sticker",
+            "microfone",
+            "enviar",
+            "menu",
+            "voltar",
+            "chamada",
+            "videochamada"
         )
 
         return items
             .filter { item ->
-                val classLooksLikeImage =
-                    item.className.contains("Image", ignoreCase = true)
+                if (item.rect.isEmpty) return@filter false
+                if (item.editable) return@filter false
 
                 val n = RouteParser.normalize(item.text)
+
+                val notToolbar =
+                    item.rect.top >= (screenHeight * 0.13).toInt() &&
+                    item.rect.bottom <= (screenHeight * 0.89).toInt()
+
+                val widthOk =
+                    item.rect.width() >= (screenWidth * 0.20).toInt() &&
+                    item.rect.width() <= (screenWidth * 0.96).toInt()
+
+                val heightOk =
+                    item.rect.height() >= (screenHeight * 0.055).toInt() &&
+                    item.rect.height() <= (screenHeight * 0.48).toInt()
+
+                if (!notToolbar || !widthOk || !heightOk) {
+                    return@filter false
+                }
+
+                if (badWords.any { it in n }) {
+                    return@filter false
+                }
+
+                val classLooksLikeImage =
+                    item.className.contains("Image", ignoreCase = true) ||
+                    item.className.contains("Photo", ignoreCase = true)
+
                 val descriptionLooksLikeImage =
                     "foto" in n ||
                     "imagem" in n ||
                     "photo" in n ||
                     "image" in n
 
-                val notToolbar =
-                    item.rect.top >= (screenHeight * 0.14).toInt() &&
-                    item.rect.bottom <= (screenHeight * 0.90).toInt()
+                // Fallback importante para o WhatsApp no M52:
+                // a miniatura pode aparecer apenas como View/FrameLayout,
+                // sem descrição "imagem". Nesse caso exigimos:
+                // - bloco visual grande;
+                // - sem texto próprio;
+                // - sem texto útil nos descendentes;
+                // - ele próprio ou algum pai próximo precisa ser clicável.
+                val blankVisualCandidate =
+                    n.isBlank() &&
+                    !hasMeaningfulDescendantText(item.node, maxDepth = 3) &&
+                    hasClickableNodeOrParent(item.node, maxDepth = 5) &&
+                    item.rect.width() >= (screenWidth * 0.28).toInt() &&
+                    item.rect.height() >= (screenHeight * 0.075).toInt()
 
-                val largeEnough =
-                    item.rect.width() >= (screenWidth * 0.20).toInt() &&
-                    item.rect.height() >= (screenHeight * 0.055).toInt()
-
-                val safeDescription = badWords.none { it in n }
-
-                (classLooksLikeImage || descriptionLooksLikeImage) &&
-                    notToolbar &&
-                    largeEnough &&
-                    safeDescription
+                classLooksLikeImage ||
+                    descriptionLooksLikeImage ||
+                    blankVisualCandidate
             }
-            .maxByOrNull { it.rect.bottom }
+            // Remove duplicações de filho/pai ocupando praticamente o mesmo retângulo.
+            .distinctBy { item ->
+                listOf(
+                    item.rect.left / 8,
+                    item.rect.top / 8,
+                    item.rect.right / 8,
+                    item.rect.bottom / 8
+                ).joinToString(":")
+            }
+    }
+
+    private fun hasClickableNodeOrParent(
+        start: AccessibilityNodeInfo,
+        maxDepth: Int
+    ): Boolean {
+        var current: AccessibilityNodeInfo? = start
+        var depth = 0
+
+        while (current != null && depth <= maxDepth) {
+            if (current.isClickable) return true
+            current = current.parent
+            depth++
+        }
+
+        return false
+    }
+
+    private fun hasMeaningfulDescendantText(
+        node: AccessibilityNodeInfo,
+        maxDepth: Int,
+        depth: Int = 0
+    ): Boolean {
+        if (depth > maxDepth) return false
+
+        val own = buildString {
+            node.text?.toString()?.let { append(it) }
+            node.contentDescription?.toString()?.let {
+                if (isNotEmpty()) append(' ')
+                append(it)
+            }
+        }
+
+        val normalized = RouteParser.normalize(own)
+
+        if (
+            normalized.length >= 3 &&
+            "foto" !in normalized &&
+            "imagem" !in normalized &&
+            "photo" !in normalized &&
+            "image" !in normalized
+        ) {
+            return true
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            if (hasMeaningfulDescendantText(child, maxDepth, depth + 1)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private fun imageCandidateScore(item: NodeItem): Long {
+        val area = item.rect.width().toLong() * item.rect.height().toLong()
+        val classBonus =
+            if (item.className.contains("Image", ignoreCase = true)) 1_000_000_000L
+            else 0L
+        val textBonus = if (
+            RouteParser.normalize(item.text).let {
+                "foto" in it || "imagem" in it || "photo" in it || "image" in it
+            }
+        ) 500_000_000L else 0L
+
+        // Dá preferência ao candidato mais baixo quando a pontuação é próxima.
+        return classBonus + textBonus + area + item.rect.bottom.toLong()
     }
 
     private fun imageFingerprint(item: NodeItem): String =
         buildString {
+            append(item.className)
+            append('|')
             append(RouteParser.normalize(item.text))
             append('|')
             append(item.rect.left)
@@ -628,6 +764,8 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             append(item.rect.right)
             append(',')
             append(item.rect.bottom)
+            append('|')
+            append(item.node.hashCode())
         }
 
     private fun textSignatures(items: List<NodeItem>): Set<String> =

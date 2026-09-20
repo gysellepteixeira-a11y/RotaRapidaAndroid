@@ -215,14 +215,17 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                 "Imagem detectada${if (hintAtivo) " (hint)" else ""}. Abrindo..."
             )
 
-            if (clickNodeOrParent(candidate.node)) {
+            if (clickImageCandidateSafely(candidate)) {
                 handler.postDelayed(
-                    { captureAndReadImage(attempt = 0) },
+                    { verifyImageViewerAndRead(attempt = 0) },
                     IMAGE_OPEN_DELAY_MS
                 )
             } else {
                 processing = false
-                Prefs.setStatus(this, "Imagem detectada, mas não consegui abrir.")
+                Prefs.setStatus(
+                    this,
+                    "Imagem candidata detectada, mas não achei um alvo de clique seguro."
+                )
                 handler.postDelayed({ primeCurrentScreen() }, 100L)
             }
             return
@@ -268,6 +271,40 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             imageHintUntil = SystemClock.elapsedRealtime() + 900L
         }
     }
+
+    private fun verifyImageViewerAndRead(attempt: Int) {
+        if (!processing) return
+
+        val root = rootInActiveWindow
+        if (root == null) {
+            processing = false
+            Prefs.setStatus(this, "Não consegui confirmar se a imagem abriu.")
+            return
+        }
+
+        val items = collectNodeItems(root)
+
+        // No grupo normal existe o campo de mensagem.
+        // No visualizador de imagem do WhatsApp esse campo desaparece.
+        val editorStillVisible = findMessageEditor(items) != null
+
+        if (editorStillVisible) {
+            // MUITO IMPORTANTE:
+            // não usa GLOBAL_ACTION_BACK aqui.
+            // Se o clique não abriu a imagem, voltar tiraria a pessoa do grupo.
+            processing = false
+            Prefs.setStatus(
+                this,
+                "Imagem detectada, mas o toque não abriu o visualizador. Não voltei do grupo."
+            )
+            handler.postDelayed({ primeCurrentScreen() }, 120L)
+            return
+        }
+
+        Prefs.setStatus(this, "Imagem aberta. Fazendo OCR...")
+        captureAndReadImage(attempt)
+    }
+
 
     private fun captureAndReadImage(attempt: Int) {
         if (!processing) return
@@ -397,7 +434,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     }
 
     private fun closeImageWithoutSending(message: String) {
-        performGlobalAction(GLOBAL_ACTION_BACK)
+        backOnlyIfImageViewerOpen()
         Prefs.setStatus(this, message)
 
         handler.postDelayed({
@@ -407,13 +444,26 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     }
 
     private fun imageFailed(message: String) {
-        performGlobalAction(GLOBAL_ACTION_BACK)
+        backOnlyIfImageViewerOpen()
         Prefs.setStatus(this, message)
 
         handler.postDelayed({
             processing = false
             primeCurrentScreen()
         }, 180L)
+    }
+
+    private fun backOnlyIfImageViewerOpen() {
+        val root = rootInActiveWindow ?: return
+        val items = collectNodeItems(root)
+
+        // Se o campo de mensagem ainda existe, continuamos no grupo.
+        // Nesse caso NÃO VOLTA.
+        if (findMessageEditor(items) != null) {
+            return
+        }
+
+        performGlobalAction(GLOBAL_ACTION_BACK)
     }
 
     private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {
@@ -815,6 +865,60 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             collectNodeItemsRecursive(child, out, depth + 1)
         }
     }
+
+    private fun clickImageCandidateSafely(candidate: NodeItem): Boolean {
+        val screenWidth = resources.displayMetrics.widthPixels
+        val screenHeight = resources.displayMetrics.heightPixels
+        val candidateRect = candidate.rect
+        val candidateArea =
+            candidateRect.width().toLong().coerceAtLeast(1L) *
+            candidateRect.height().toLong().coerceAtLeast(1L)
+
+        var current: AccessibilityNodeInfo? = candidate.node
+        var depth = 0
+
+        while (current != null && depth <= 4) {
+            val rect = Rect()
+            current.getBoundsInScreen(rect)
+
+            val area =
+                rect.width().toLong().coerceAtLeast(1L) *
+                rect.height().toLong().coerceAtLeast(1L)
+
+            val centerClose =
+                abs(rect.centerX() - candidateRect.centerX()) <=
+                    maxOf(30, candidateRect.width() / 3) &&
+                abs(rect.centerY() - candidateRect.centerY()) <=
+                    maxOf(30, candidateRect.height() / 3)
+
+            val notWholeChat =
+                rect.width() <= (screenWidth * 0.96).toInt() &&
+                rect.height() <= (screenHeight * 0.60).toInt()
+
+            // Um pai clicável válido pode ser um pouco maior que a miniatura,
+            // mas nunca o painel inteiro da conversa.
+            val tightEnough =
+                area <= candidateArea * 4L
+
+            if (
+                current.isClickable &&
+                centerClose &&
+                notWholeChat &&
+                tightEnough &&
+                current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            ) {
+                return true
+            }
+
+            current = current.parent
+            depth++
+        }
+
+        // Se o próprio candidato for clicável, uma última tentativa direta.
+        return candidate.node.isClickable &&
+            candidate.node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
 
     private fun clickNodeOrParent(start: AccessibilityNodeInfo): Boolean {
         var current: AccessibilityNodeInfo? = start

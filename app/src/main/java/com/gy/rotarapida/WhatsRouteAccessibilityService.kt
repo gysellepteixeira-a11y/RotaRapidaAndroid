@@ -1,9 +1,11 @@
 package com.gy.rotarapida
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
 import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
 import android.accessibilityservice.AccessibilityService.ScreenshotResult
 import android.graphics.Bitmap
+import android.graphics.Path
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Handler
@@ -212,7 +214,8 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             val hintAtivo = SystemClock.elapsedRealtime() <= imageHintUntil
             Prefs.setStatus(
                 this,
-                "Imagem detectada${if (hintAtivo) " (hint)" else ""}. Abrindo..."
+                "Imagem candidata x=${candidate.rect.left}, y=${candidate.rect.top}, " +
+                    "w=${candidate.rect.width()}, h=${candidate.rect.height()}. Tocando..."
             )
 
             if (clickImageCandidateSafely(candidate)) {
@@ -713,14 +716,26 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                 // - ele próprio ou algum pai próximo precisa ser clicável.
                 val blankVisualCandidate =
                     n.isBlank() &&
-                    !hasMeaningfulDescendantText(item.node, maxDepth = 3) &&
-                    hasClickableNodeOrParent(item.node, maxDepth = 5) &&
-                    item.rect.width() >= (screenWidth * 0.28).toInt() &&
-                    item.rect.height() >= (screenHeight * 0.075).toInt()
+                    item.rect.width() >= (screenWidth * 0.24).toInt() &&
+                    item.rect.height() >= (screenHeight * 0.060).toInt()
+
+                // Alguns WhatsApps/Samsung expõem a miniatura como View/FrameLayout
+                // sem texto e sem ACTION_CLICK. O toque por coordenada da v0.4
+                // permite usar esses nós também.
+                val genericVisualCandidate =
+                    n.length <= 12 &&
+                    (
+                        item.className.contains("View", ignoreCase = true) ||
+                        item.className.contains("Frame", ignoreCase = true) ||
+                        item.className.contains("Layout", ignoreCase = true)
+                    ) &&
+                    item.rect.width() >= (screenWidth * 0.26).toInt() &&
+                    item.rect.height() >= (screenHeight * 0.070).toInt()
 
                 classLooksLikeImage ||
                     descriptionLooksLikeImage ||
-                    blankVisualCandidate
+                    blankVisualCandidate ||
+                    genericVisualCandidate
             }
             // Remove duplicações de filho/pai ocupando praticamente o mesmo retângulo.
             .distinctBy { item ->
@@ -869,42 +884,75 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     private fun clickImageCandidateSafely(candidate: NodeItem): Boolean {
         val screenWidth = resources.displayMetrics.widthPixels
         val screenHeight = resources.displayMetrics.heightPixels
-        val candidateRect = candidate.rect
-        val candidateArea =
-            candidateRect.width().toLong().coerceAtLeast(1L) *
-            candidateRect.height().toLong().coerceAtLeast(1L)
+        val r = candidate.rect
 
+        if (r.isEmpty) return false
+
+        // Toca dentro da miniatura por COORDENADA, sem depender de o WhatsApp
+        // marcar aquele nó como "clickable". Isso é mais confiável no M52.
+        val tapX = r.centerX()
+            .coerceIn(8, screenWidth - 8)
+
+        // 42% da altura tende a cair no conteúdo da foto, evitando timestamp/caption.
+        val tapY = (r.top + (r.height() * 0.42f)).toInt()
+            .coerceIn(
+                (screenHeight * 0.14).toInt(),
+                (screenHeight * 0.88).toInt()
+            )
+
+        val path = Path().apply {
+            moveTo(tapX.toFloat(), tapY.toFloat())
+        }
+
+        val gesture = GestureDescription.Builder()
+            .addStroke(
+                GestureDescription.StrokeDescription(
+                    path,
+                    0L,
+                    45L
+                )
+            )
+            .build()
+
+        val gestureAccepted = dispatchGesture(
+            gesture,
+            object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    Prefs.setStatus(
+                        this@WhatsRouteAccessibilityService,
+                        "Toque na imagem executado em ($tapX,$tapY). Confirmando abertura..."
+                    )
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    Prefs.setStatus(
+                        this@WhatsRouteAccessibilityService,
+                        "Toque por coordenada foi cancelado."
+                    )
+                }
+            },
+            null
+        )
+
+        if (gestureAccepted) {
+            return true
+        }
+
+        // Fallback: tenta ACTION_CLICK somente se o Android não aceitou o gesto.
         var current: AccessibilityNodeInfo? = candidate.node
         var depth = 0
 
-        while (current != null && depth <= 4) {
+        while (current != null && depth <= 5) {
             val rect = Rect()
             current.getBoundsInScreen(rect)
 
-            val area =
-                rect.width().toLong().coerceAtLeast(1L) *
-                rect.height().toLong().coerceAtLeast(1L)
-
-            val centerClose =
-                abs(rect.centerX() - candidateRect.centerX()) <=
-                    maxOf(30, candidateRect.width() / 3) &&
-                abs(rect.centerY() - candidateRect.centerY()) <=
-                    maxOf(30, candidateRect.height() / 3)
-
             val notWholeChat =
-                rect.width() <= (screenWidth * 0.96).toInt() &&
-                rect.height() <= (screenHeight * 0.60).toInt()
-
-            // Um pai clicável válido pode ser um pouco maior que a miniatura,
-            // mas nunca o painel inteiro da conversa.
-            val tightEnough =
-                area <= candidateArea * 4L
+                rect.width() <= (screenWidth * 0.98).toInt() &&
+                rect.height() <= (screenHeight * 0.70).toInt()
 
             if (
                 current.isClickable &&
-                centerClose &&
                 notWholeChat &&
-                tightEnough &&
                 current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             ) {
                 return true
@@ -914,9 +962,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             depth++
         }
 
-        // Se o próprio candidato for clicável, uma última tentativa direta.
-        return candidate.node.isClickable &&
-            candidate.node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        return false
     }
 
 

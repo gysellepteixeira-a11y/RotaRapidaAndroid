@@ -65,6 +65,9 @@ jobs:
       - name: Aplicar v0.22 grid-first Bairro depois Gaiola
         run: python3 scripts/patch_v22.py
 
+      - name: Aplicar v0.23 bairros normalizados por linha
+        run: python3 scripts/patch_v23.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -89,6 +92,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.22-GRID-2X
+          name: RotaRapida-APK-v0.23-GRID-NORMALIZADA
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

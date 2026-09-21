@@ -63,11 +63,14 @@ if old_guard not in s:
     raise SystemExit('patch_v19_any_group: protecao de grupo durante envio nao encontrada')
 s = s.replace(old_guard, new_guard)
 
-remaining = [line for line in s.splitlines() if 'Prefs.groupName(this)' in line]
-if remaining:
-    print('DEPENDENCIAS RESTANTES:')
-    for line in remaining:
-        print(line)
+lines = s.splitlines()
+indexes = [i for i, line in enumerate(lines) if 'Prefs.groupName(this)' in line]
+if indexes:
+    print('DEPENDENCIAS RESTANTES COM CONTEXTO:')
+    for i in indexes:
+        print('---')
+        for j in range(max(0, i - 6), min(len(lines), i + 7)):
+            print(f'{j+1}: {lines[j]}')
     raise SystemExit('patch_v19_any_group: ainda existe Prefs.groupName(this) no service final')
 
 service_path.write_text(s, encoding="utf-8")

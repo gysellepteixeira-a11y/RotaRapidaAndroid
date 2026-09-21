@@ -6,6 +6,7 @@ s = service_path.read_text(encoding="utf-8")
 # Mantem o ML Kit aquecido enquanto o bot estiver ARMADO procurando rota.
 # Nao altera a leitura real da v0.19, o parser, o envio ou as notificacoes.
 # Quando o bot para depois de enviar, o aquecimento tambem para de executar OCR.
+# Teste A/B: intervalo de 15 segundos.
 
 const_anchor = '        private const val DEDUP_MS = 8_000L\n'
 if 'KEEP_OCR_WARM_INTERVAL_MS' not in s:
@@ -49,7 +50,6 @@ if 'keepOcrWarmRunnable' not in s:
         raise SystemExit('patch_v19_keep_ocr_warm: recognizer nao encontrado')
     s = s.replace(recognizer_anchor, recognizer_anchor + '\n' + warm_state, 1)
 
-# Inicia o ciclo depois do warm-up normal do service.
 connect_anchor = '''        warmUpRecognizer()
         handler.postDelayed({ primeCurrentScreen() }, 350)
 '''
@@ -62,8 +62,6 @@ if connect_anchor not in s:
     raise SystemExit('patch_v19_keep_ocr_warm: onServiceConnected nao encontrado')
 s = s.replace(connect_anchor, connect_new, 1)
 
-# OCR minimo, invisivel e independente de status. Usa o MESMO recognizer da rota
-# para manter a instancia e os recursos nativos ativos.
 warm_func_anchor = '''    private fun warmUpRecognizer() {
 '''
 keep_func = '''    private fun keepOcrEngineWarm() {
@@ -97,7 +95,6 @@ if 'private fun keepOcrEngineWarm()' not in s:
         raise SystemExit('patch_v19_keep_ocr_warm: warmUpRecognizer nao encontrado')
     s = s.replace(warm_func_anchor, keep_func + warm_func_anchor, 1)
 
-# Remove o callback quando o service for destruido.
 destroy_anchor = '''    override fun onDestroy() {
         recognizer.close()
         super.onDestroy()

@@ -95,6 +95,9 @@ jobs:
       - name: Ignorar abre e fecha do admin no gatilho de imagem
         run: python3 scripts/patch_v19_mediastore_ignore_admin_toggle.py
 
+      - name: Adicionar diagnostico detalhado de velocidade
+        run: python3 scripts/patch_v19_speed_diagnostic.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -119,6 +122,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-ADMIN-TOGGLE-FIX
+          name: RotaRapida-APK-v0.19-DIAGNOSTICO-VELOCIDADE
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

@@ -59,6 +59,9 @@ jobs:
       - name: Aplicar v0.21 OCR compacto Gaiola+Bairro
         run: python3 scripts/patch_v21.py
 
+      - name: Preparar matcher de prioridade da v0.22
+        run: python3 scripts/patch_v22_pre.py
+
       - name: Aplicar v0.22 grid-first Bairro depois Gaiola
         run: python3 scripts/patch_v22.py
 

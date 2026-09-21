@@ -35,6 +35,9 @@ jobs:
       - name: Aplicar correcao v0.13 zoom real tabela densa
         run: python3 scripts/patch_v13.py
 
+      - name: Aplicar teste v0.14 MediaStore sem abrir imagem
+        run: python3 scripts/patch_v14.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -59,6 +62,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.13
+          name: RotaRapida-APK-v0.14-MediaStore
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

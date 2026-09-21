@@ -71,6 +71,9 @@ jobs:
       - name: Fazer 20 avisos sem bloquear nova busca
         run: python3 scripts/patch_v19_alerts_nonblocking.py
 
+      - name: Liberar processamento imediatamente apos envio
+        run: python3 scripts/patch_v19_processing_reset.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -95,6 +98,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-20-AVISOS-NAO-BLOQUEIAM
+          name: RotaRapida-APK-v0.19-PROCESSING-RESET
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

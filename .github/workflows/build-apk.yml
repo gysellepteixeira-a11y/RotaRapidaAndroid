@@ -80,9 +80,6 @@ jobs:
       - name: Manter OCR aquecido enquanto procura rota
         run: python3 scripts/patch_v19_keep_ocr_warm.py
 
-      - name: Ler rota mesmo com grupo fora da conversa
-        run: python3 scripts/patch_v19_closed_group_watch.py
-
       - name: Ler rota com grupo bloqueado pelo admin
         run: python3 scripts/patch_v19_admin_locked_group.py
 
@@ -110,6 +107,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-ADMIN-LOCK
+          name: RotaRapida-APK-v0.19-ADMIN-FECHADO
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

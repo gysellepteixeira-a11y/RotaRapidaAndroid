@@ -86,6 +86,9 @@ jobs:
       - name: Estabilizar leitura com grupo bloqueado pelo admin
         run: python3 scripts/patch_v19_admin_lock_stable.py
 
+      - name: Ignorar avisos de configuracao como imagem
+        run: python3 scripts/patch_v19_admin_message_noise_fix.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -110,6 +113,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-ADMIN-ESTAVEL
+          name: RotaRapida-APK-v0.19-ADMIN-MENSAGENS-FIX
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

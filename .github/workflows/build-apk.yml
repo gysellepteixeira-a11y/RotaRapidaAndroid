@@ -53,6 +53,9 @@ jobs:
       - name: Aplicar v0.19 tabela densa de pouca altura
         run: python3 scripts/patch_v19.py
 
+      - name: Corrigir compilacao da v0.19
+        run: python3 scripts/patch_v20.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:

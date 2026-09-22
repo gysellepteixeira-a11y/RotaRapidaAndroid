@@ -11,10 +11,10 @@ prefs = prefs.replace(
     '===== DIAGNOSTICO IMAGEM v0.19 DENSA RECOVERY ====='
 )
 
-gradle = gradle.replace('versionCode = 1', 'versionCode = 2')
-gradle = gradle.replace('versionName = "0.1-test"', 'versionName = "0.19-densa-recovery"')
+gradle = gradle.replace('versionCode = 1', 'versionCode = 3')
+gradle = gradle.replace('versionName = "0.1-test"', 'versionName = "0.19-densa-cage-fix"')
 
 prefs_path.write_text(prefs, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
 
-print("Marker DENSA RECOVERY aplicado + versionCode 2")
+print("Marker DENSA RECOVERY aplicado + versionCode 3")

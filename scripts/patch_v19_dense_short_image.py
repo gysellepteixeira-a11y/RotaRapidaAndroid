@@ -19,9 +19,8 @@ gradle = gradle_path.read_text(encoding="utf-8")
 # - tenta detector denso a partir de 180 px (133 px continua no caminho rapido
 #   antigo que ja funciona muito bem);
 # - detector aceita tabela a partir de 180 px;
-# - recovery geometrico vale para qualquer tabela que passou no DENSE_MIN_ROWS=8,
-#   nao somente 20+ linhas. O limite vertical continua baseado no passo real da
-#   linha, portanto nao ampliamos a tolerancia entre linhas vizinhas.
+# - recovery especial (bairro prioritario + OCR pequeno somente da Gaiola) passa
+#   a valer para qualquer tabela que ja foi classificada como densa: 8+ linhas.
 
 old_dispatch = '''        if (media.height >= 300) {
             readMediaLargeColorCrop(media)
@@ -45,11 +44,17 @@ if old_guard not in s:
     raise SystemExit("dense short: guard h<260 nao encontrado")
 s = s.replace(old_guard, new_guard, 1)
 
-old_recovery = '        if (expectedDenseRows < 20) {\n            return null\n        }\n'
-new_recovery = '        if (expectedDenseRows < 8) {\n            return null\n        }\n'
-if old_recovery not in s:
-    raise SystemExit("dense short: limite recovery <20 nao encontrado")
-s = s.replace(old_recovery, new_recovery, 1)
+old_prepare_recovery = '        if (expectedDenseRows < 20) return null\n'
+new_prepare_recovery = '        if (expectedDenseRows < 8) return null\n'
+if old_prepare_recovery not in s:
+    raise SystemExit("dense short: limite expectedDenseRows <20 nao encontrado")
+s = s.replace(old_prepare_recovery, new_prepare_recovery, 1)
+
+old_trigger_recovery = '                        detected.rowCount >= 20 &&\n'
+new_trigger_recovery = '                        detected.rowCount >= 8 &&\n'
+if old_trigger_recovery not in s:
+    raise SystemExit("dense short: gatilho detected.rowCount >=20 nao encontrado")
+s = s.replace(old_trigger_recovery, new_trigger_recovery, 1)
 
 # Identificacao inequívoca no diagnostico.
 prefs = prefs.replace(
@@ -67,7 +72,6 @@ gradle = gradle.replace(
     'versionName = "0.19-densa-recovery-fast"',
     'versionName = "0.19-densa-baixa"'
 )
-# Fallback caso o fast marker nao tenha alterado o versionName por alguma razao.
 gradle = gradle.replace(
     'versionName = "0.19-densa-cage-fix"',
     'versionName = "0.19-densa-baixa"'
@@ -77,4 +81,4 @@ service_path.write_text(s, encoding="utf-8")
 prefs_path.write_text(prefs, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
 
-print("Dense short aplicado: 180px+ usa detector denso; recovery liberado para 8+ linhas; versionCode 5")
+print("Dense short aplicado: 180px+ usa detector denso; recovery OCR Gaiola liberado para 8+ linhas; versionCode 5")

@@ -20,7 +20,6 @@ s = service_path.read_text(encoding="utf-8")
 # Tambem registra diagnostico do bairro/gaiolas proximas quando o parser estrito
 # falhar, para podermos ajustar sem adivinhar.
 
-# Estado de diagnostico da recuperacao densa.
 state_anchor = '    private var speedDiagnosticSendMethod = "nenhum"\n'
 if 'private var lastDenseRecoveryDebug' not in s:
     if state_anchor not in s:
@@ -31,7 +30,6 @@ if 'private var lastDenseRecoveryDebug' not in s:
         1
     )
 
-# parseVisionText recebe opcionalmente a quantidade REAL de linhas detectadas.
 old_signature = '''    private fun parseVisionText(
         visionText: Text,
         screenHeight: Int
@@ -47,7 +45,6 @@ if old_signature not in s:
     raise SystemExit('patch_v19_dense_row_recovery: assinatura parseVisionText nao encontrada')
 s = s.replace(old_signature, new_signature, 1)
 
-# Troca apenas o retorno final do parser da Otimizacao 1.
 old_tail = '''        screenItems.addAll(reconstructedItems)
 
         return RouteParser.parseImageScreenTexts(screenItems)
@@ -55,15 +52,12 @@ old_tail = '''        screenItems.addAll(reconstructedItems)
 '''
 new_tail = r'''        screenItems.addAll(reconstructedItems)
 
-        // Primeiro continua valendo exatamente o parser estrito da Otimizacao 1.
         val strictResult = RouteParser.parseImageScreenTexts(screenItems)
         if (strictResult != null) {
             lastDenseRecoveryDebug = "estrito=ok"
             return strictResult
         }
 
-        // Recuperacao extra SOMENTE para tabelas realmente densas. Em imagens
-        // pequenas/medias nada muda.
         if (expectedDenseRows < 20) {
             return null
         }
@@ -75,9 +69,6 @@ new_tail = r'''        screenItems.addAll(reconstructedItems)
 
         val priorityHits = ArrayList<PriorityHit>()
 
-        // Usar A00 como gaiola artificial permite consultar o MESMO matcher de
-        // prioridade do RouteParser (inclusive tolerancia de 1 erro de OCR), sem
-        // duplicar regras de bairro aqui.
         for (item in screenItems) {
             val probe = RouteParser.parsePlainTexts(
                 listOf("A00 ${item.text}")
@@ -98,9 +89,6 @@ new_tail = r'''        screenItems.addAll(reconstructedItems)
             .minByOrNull { it.item.top }
             ?: return null
 
-        // A altura usada aqui ja e a altura do crop ESCALADO enviado ao OCR.
-        // Portanto height/rowCount representa diretamente o passo vertical entre
-        // duas linhas consecutivas no sistema de coordenadas do ML Kit.
         val rowPitch = screenHeight.toFloat() / expectedDenseRows.toFloat()
         val maxSameRowDistance = maxOf(8f, rowPitch * 0.48f)
         val neighborhoodY = chosen.item.centerY
@@ -113,8 +101,6 @@ new_tail = r'''        screenItems.addAll(reconstructedItems)
 
         val cages = ArrayList<CageHit>()
 
-        // Usa somente os elementos OCR originais (parts), nao as linhas
-        // reconstruidas, para nao criar gaiolas duplicadas/mescladas no recovery.
         for (part in parts) {
             val cage = RouteParser.extractCage(part.text) ?: continue
             if (part.rect.left >= chosen.item.left) continue
@@ -149,15 +135,15 @@ new_tail = r'''        screenItems.addAll(reconstructedItems)
         if (nearest == null) {
             lastDenseRecoveryDebug =
                 "recovery=${expectedDenseRows}; bairro=${chosen.result.neighborhood}@${neighborhoodY}; " +
-                    "pitch=${String.format(java.util.Locale.US, \"%.1f\", rowPitch)}; " +
-                    "limite=${String.format(java.util.Locale.US, \"%.1f\", maxSameRowDistance)}; " +
+                    "pitch=${String.format(java.util.Locale.US, "%.1f", rowPitch)}; " +
+                    "limite=${String.format(java.util.Locale.US, "%.1f", maxSameRowDistance)}; " +
                     "gaiolas=$debugCages; escolha=nenhuma"
             return null
         }
 
         lastDenseRecoveryDebug =
             "recovery=${expectedDenseRows}; bairro=${chosen.result.neighborhood}@${neighborhoodY}; " +
-                "pitch=${String.format(java.util.Locale.US, \"%.1f\", rowPitch)}; " +
+                "pitch=${String.format(java.util.Locale.US, "%.1f", rowPitch)}; " +
                 "gaiolas=$debugCages; escolha=${nearest.cage}"
 
         return RouteResult(
@@ -171,8 +157,6 @@ if old_tail not in s:
     raise SystemExit('patch_v19_dense_row_recovery: final do parser da Otimizacao 1 nao encontrado')
 s = s.replace(old_tail, new_tail, 1)
 
-# No caminho DENSA passamos o numero de linhas detectado. Os outros caminhos
-# continuam usando o argumento padrao 0 e permanecem inalterados.
 dense_start = s.find('    private fun readMediaLargeColorCrop(media: MediaImage) {')
 dense_end = s.find('    private fun prepareEnhancedFileBitmap(source: Bitmap): Bitmap {', dense_start)
 if dense_start < 0 or dense_end < 0:
@@ -185,7 +169,6 @@ if old_call not in dense_block:
     raise SystemExit('patch_v19_dense_row_recovery: chamada parseVisionText DENSA nao encontrada')
 dense_block = dense_block.replace(old_call, new_call, 1)
 
-# Se ainda falhar, o diagnostico mostra o que foi reconhecido perto do bairro.
 old_fail = '''                    Prefs.setStatus(
                         this,
                         "OCR denso leu $totalLinhas linhas sem fechar rota. " +

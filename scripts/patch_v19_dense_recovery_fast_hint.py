@@ -1,12 +1,10 @@
 from pathlib import Path
 
 service_path = Path("app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt")
-parser_path = Path("app/src/main/java/com/gy/rotarapida/RouteParser.kt")
 prefs_path = Path("app/src/main/java/com/gy/rotarapida/Prefs.kt")
 gradle_path = Path("app/build.gradle.kts")
 
 service = service_path.read_text(encoding="utf-8")
-parser = parser_path.read_text(encoding="utf-8")
 prefs = prefs_path.read_text(encoding="utf-8")
 gradle = gradle_path.read_text(encoding="utf-8")
 
@@ -16,32 +14,7 @@ gradle = gradle_path.read_text(encoding="utf-8")
 # Nao muda OCR, crop, prioridade, linha escolhida nem envio.
 # Apenas elimina o custo de chamar parsePlainTexts(listOf("A00 ...")) para
 # cada fragmento OCR quando o parser normal ja falhou numa tabela muito densa.
-# A nova funcao publica delega EXATAMENTE para a mesma priorityFor() existente.
-
-priority_anchor = '''    private fun priorityFor(text: String): Pair<Int, String>? {
-        val normalized = normalize(text)
-        if (normalized.isBlank()) return null
-
-        priorities.forEachIndexed { index, rule ->
-            if (rule.requiredTokens.all { normalized.contains(it) }) {
-                return index to rule.name
-            }
-        }
-
-        return null
-    }
-'''
-
-priority_replacement = priority_anchor + '''
-    // Usado somente pelo recovery denso. Mantem exatamente as mesmas regras
-    // de prioridade do parser normal, sem fabricar uma gaiola temporaria.
-    fun priorityHint(text: String): Pair<Int, String>? = priorityFor(text)
-'''
-
-if 'fun priorityHint(text: String)' not in parser:
-    if priority_anchor not in parser:
-        raise SystemExit('fast hint: priorityFor nao encontrado no RouteParser')
-    parser = parser.replace(priority_anchor, priority_replacement, 1)
+# As 7 regras abaixo sao exatamente as prioridades finais da v0.19.
 
 old_block = r'''        data class PriorityHint(
             val result: RouteResult,
@@ -123,6 +96,24 @@ new_block = r'''        data class PriorityHint(
             val rawPart: Boolean
         )
 
+        fun fastPriorityHint(text: String): Pair<Int, String>? {
+            val normalized = RouteParser.normalize(text)
+            if (normalized.isBlank()) return null
+
+            return when {
+                normalized.contains("valparaiso") -> 0 to "Valparaiso"
+                normalized.contains("colina") -> 1 to "Colina de Laranjeiras"
+                normalized.contains("praia") && normalized.contains("baleia") ->
+                    2 to "Praia da Baleia"
+                normalized.contains("morada") -> 3 to "Morada de Laranjeiras"
+                normalized.contains("eurico") -> 4 to "Eurico"
+                normalized.contains("manoel") && normalized.contains("plaza") ->
+                    5 to "Manoel Plaza"
+                normalized.contains("rosario") -> 6 to "Rosario"
+                else -> null
+            }
+        }
+
         var bestPriority = Int.MAX_VALUE
         var bestRaw: PriorityHint? = null
         var bestAny: PriorityHint? = null
@@ -133,7 +124,7 @@ new_block = r'''        data class PriorityHint(
             top: Int,
             rawPart: Boolean
         ) {
-            val priority = RouteParser.priorityHint(text) ?: return
+            val priority = fastPriorityHint(text) ?: return
             val index = priority.first
             val hit = PriorityHint(
                 priorityIndex = index,
@@ -162,8 +153,8 @@ new_block = r'''        data class PriorityHint(
             }
         }
 
-        // Mesmas fontes da versao anterior, mas sem listOf(), sem gaiola A00
-        // artificial e sem rodar o parser completo centenas de vezes.
+        // Mesmas fontes e mesma regra de escolha da versao anterior, mas sem
+        // listOf(), sem gaiola A00 artificial e sem parser completo por palavra.
         for (part in parts) {
             considerPriorityHint(
                 text = part.text,
@@ -210,15 +201,14 @@ prefs = prefs.replace(
     '===== DIAGNOSTICO IMAGEM v0.19 DENSA RECOVERY =====',
     '===== DIAGNOSTICO IMAGEM v0.19 DENSA RECOVERY FAST ====='
 )
-gradle = gradle.replace('versionCode = 2', 'versionCode = 3')
+gradle = gradle.replace('versionCode = 3', 'versionCode = 4')
 gradle = gradle.replace(
-    'versionName = "0.19-densa-recovery"',
+    'versionName = "0.19-densa-cage-fix"',
     'versionName = "0.19-densa-recovery-fast"'
 )
 
 service_path.write_text(service, encoding="utf-8")
-parser_path.write_text(parser, encoding="utf-8")
 prefs_path.write_text(prefs, encoding="utf-8")
 gradle_path.write_text(gradle, encoding="utf-8")
 
-print("Dense recovery FAST aplicado: mesma prioridade/linha, menos custo no hint + versionCode 3")
+print("Dense recovery FAST aplicado: mesma prioridade/linha, menos custo no hint + versionCode 4")

@@ -140,6 +140,9 @@ jobs:
       - name: Acelerar envio de rota pendente apos admin liberar
         run: python3 scripts/patch_v19_admin_ultra_10_6.py
 
+      - name: Buscar Enviar direto e confirmar rota pendente mais cedo
+        run: python3 scripts/patch_v19_admin_ultra_direct_fast.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -164,6 +167,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-SEND-READY-ADMIN-ULTRA-10-6
+          name: RotaRapida-APK-v0.19-SEND-READY-ADMIN-ULTRA-DIRECT-FAST
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

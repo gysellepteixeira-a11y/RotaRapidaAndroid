@@ -119,6 +119,12 @@ jobs:
       - name: Ler tambem imagens densas baixas
         run: python3 scripts/patch_v19_dense_short_image.py
 
+      - name: Preservar MediaStore 25ms e pre-OCR 10ms
+        run: python3 scripts/patch_v19_media25_preocr10.py
+
+      - name: Separar Bairro primeiro e Gaiola depois
+        run: python3 scripts/patch_v19_bairro_first_cage_second.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -143,6 +149,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-DENSA-BAIXA
+          name: RotaRapida-APK-v0.19-BAIRRO-FIRST-MEDIA25
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

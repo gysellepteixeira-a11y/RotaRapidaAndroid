@@ -137,6 +137,9 @@ jobs:
       - name: Esperar botao Enviar ficar pronto antes do unico clique
         run: python3 scripts/patch_v19_send_wait_ready.py
 
+      - name: Acelerar envio de rota pendente apos admin liberar
+        run: python3 scripts/patch_v19_admin_ultra_10_6.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -161,6 +164,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-BAIRRO-FIRST-CAGE-NARROW-SEND-READY
+          name: RotaRapida-APK-v0.19-SEND-READY-ADMIN-ULTRA-10-6
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

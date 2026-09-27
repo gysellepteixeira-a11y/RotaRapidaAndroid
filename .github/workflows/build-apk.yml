@@ -143,6 +143,9 @@ jobs:
       - name: Buscar Enviar direto e confirmar rota pendente mais cedo
         run: python3 scripts/patch_v19_admin_ultra_direct_fast.py
 
+      - name: Buscar Enviar perto do campo sem status antes do clique
+        run: python3 scripts/patch_v19_admin_ultra_sibling_fast.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -167,6 +170,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-SEND-READY-ADMIN-ULTRA-DIRECT-FAST
+          name: RotaRapida-APK-v0.19-SEND-READY-ADMIN-ULTRA-SIBLING-FAST
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

@@ -1,0 +1,124 @@
+name: Exportar fonte MEDIA10 STATUSLEAN
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Aplicar correcao v0.7 da imagem
+        run: python3 scripts/patch_v07.py
+      - name: Aplicar correcao v0.8 download e OCR
+        run: python3 scripts/patch_v08.py
+      - name: Aplicar correcao v0.9 estabilidade real
+        run: python3 scripts/patch_v09.py
+      - name: Aplicar correcao v0.10 abertura confiavel
+        run: python3 scripts/patch_v10.py
+      - name: Aplicar correcao v0.11 linha exata da gaiola
+        run: python3 scripts/patch_v11.py
+      - name: Aplicar correcao v0.12 reconstruir linhas OCR
+        run: python3 scripts/patch_v12.py
+      - name: Aplicar correcao v0.13 zoom real tabela densa
+        run: python3 scripts/patch_v13.py
+      - name: Aplicar teste v0.14 MediaStore sem abrir imagem
+        run: python3 scripts/patch_v14.py
+      - name: Aplicar v0.15 somente arquivos e envio robusto
+        run: python3 scripts/patch_v15.py
+      - name: Aplicar v0.16 prioridade estrita e envio confirmado
+        run: python3 scripts/patch_v16.py
+      - name: Aplicar v0.17 velocidade experimental
+        run: python3 scripts/patch_v17.py
+      - name: Aplicar v0.18 crop por cor em tabelas grandes
+        run: python3 scripts/patch_v18.py
+      - name: Aplicar v0.19 tabela densa de pouca altura
+        run: python3 scripts/patch_v19.py
+      - name: Corrigir compilacao da v0.19
+        run: python3 scripts/patch_v20.py
+      - name: Aplicar ajustes finais da v0.19
+        run: python3 scripts/patch_v19_final.py
+      - name: Parar apos envio ate procurar novamente
+        run: python3 scripts/patch_v19_stop_after_send.py
+      - name: Corrigir leitura ao procurar novamente
+        run: python3 scripts/patch_v19_stop_read_fix.py
+      - name: Corrigir primeira rota e restaurar tempo de envio
+        run: python3 scripts/patch_v19_first_route_timing_fix.py
+      - name: Fazer 20 avisos sem bloquear nova busca
+        run: python3 scripts/patch_v19_alerts_nonblocking.py
+      - name: Liberar processamento imediatamente apos envio
+        run: python3 scripts/patch_v19_processing_reset.py
+      - name: Remover necessidade de nome do grupo
+        run: python3 scripts/patch_v19_any_group.py
+      - name: Manter OCR aquecido enquanto procura rota
+        run: python3 scripts/patch_v19_keep_ocr_warm.py
+      - name: Ler rota com grupo bloqueado pelo admin
+        run: python3 scripts/patch_v19_admin_locked_group.py
+      - name: Estabilizar leitura com grupo bloqueado pelo admin
+        run: python3 scripts/patch_v19_admin_lock_stable.py
+      - name: Ignorar avisos de configuracao como imagem
+        run: python3 scripts/patch_v19_admin_message_noise_fix.py
+      - name: Ler imagem direto do MediaStore
+        run: python3 scripts/patch_v19_direct_mediastore_watch.py
+      - name: Ignorar abre e fecha do admin no gatilho de imagem
+        run: python3 scripts/patch_v19_mediastore_ignore_admin_toggle.py
+      - name: Adicionar diagnostico detalhado de velocidade
+        run: python3 scripts/patch_v19_speed_diagnostic.py
+      - name: Aplicar otimizacao 1 de velocidade
+        run: python3 scripts/patch_v19_optimization1.py
+      - name: Recuperar gaiola em tabelas muito densas
+        run: python3 scripts/patch_v19_dense_row_recovery.py
+      - name: Corrigir compatibilidade Kotlin do recovery
+        run: python3 scripts/patch_v19_dense_recovery_compile_fix.py
+      - name: Aceitar tracos OCR alternativos na Gaiola
+        run: python3 scripts/patch_v19_dense_cage_unicode_fix.py
+      - name: Marcar versao DENSA RECOVERY
+        run: python3 scripts/patch_v19_dense_recovery_marker.py
+      - name: Acelerar busca do bairro no recovery
+        run: python3 scripts/patch_v19_dense_recovery_fast_hint.py
+      - name: Ler tambem imagens densas baixas
+        run: python3 scripts/patch_v19_dense_short_image.py
+      - name: Preservar MediaStore 25ms e pre-OCR 10ms
+        run: python3 scripts/patch_v19_media25_preocr10.py
+      - name: Separar Bairro primeiro e Gaiola depois
+        run: python3 scripts/patch_v19_bairro_first_cage_second.py
+      - name: Estreitar recorte somente da Gaiola
+        run: python3 scripts/patch_v19_cage_narrow.py
+      - name: Testar apenas uma tentativa de envio
+        run: python3 scripts/patch_v19_send_one_attempt.py
+      - name: Confirmar primeiro clique por polling sem reenviar
+        run: python3 scripts/patch_v19_send_one_click_poll.py
+      - name: Esperar botao Enviar ficar pronto antes do unico clique
+        run: python3 scripts/patch_v19_send_wait_ready.py
+      - name: Aplicar MediaStore10 e remover status pre-OCR
+        run: python3 scripts/patch_v19_send_ready_media10_statuslean.py
+
+      - name: Criar README da versao
+        run: |
+          cat > SOURCE_VERSION.txt <<'EOF'
+          RotaRapida v0.19 BAIRRO FIRST GAIOLA NARROW SEND READY MEDIA10 STATUSLEAN
+          Snapshot do codigo-fonte apos todos os patches usados para gerar o APK.
+          OCR Bairro x1.55; Gaiola NARROW; SEND READY; MediaStore 10 ms; STATUSLEAN.
+          EOF
+
+      - name: Disponibilizar codigo-fonte completo
+        uses: actions/upload-artifact@v4
+        with:
+          name: RotaRapida-v0.19-MEDIA10-STATUSLEAN-SOURCE
+          path: |
+            app/src
+            app/build.gradle.kts
+            build.gradle.kts
+            settings.gradle.kts
+            gradle.properties
+            gradlew
+            gradlew.bat
+            gradle
+            scripts
+            SOURCE_VERSION.txt
+          if-no-files-found: error

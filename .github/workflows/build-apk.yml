@@ -140,6 +140,15 @@ jobs:
       - name: Aplicar MediaStore10 e remover status pre-OCR
         run: python3 scripts/patch_v19_send_ready_media10_statuslean.py
 
+      - name: Acelerar rota pendente apos admin liberar
+        run: python3 scripts/patch_v19_admin_ultra_10_6.py
+
+      - name: Buscar Enviar direto na rota pendente
+        run: python3 scripts/patch_v19_admin_ultra_direct_fast.py
+
+      - name: Confirmar combinacao MEDIA10 e ADMIN DIRECT
+        run: python3 scripts/patch_v19_media10_statuslean_admin_direct_marker.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -164,6 +173,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-SEND-READY-MEDIA10-STATUSLEAN
+          name: RotaRapida-APK-v0.19-MEDIA10-STATUSLEAN-ADMIN-ULTRA-DIRECT-FAST
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

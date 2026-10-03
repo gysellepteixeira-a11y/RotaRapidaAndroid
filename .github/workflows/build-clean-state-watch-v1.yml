@@ -1,0 +1,89 @@
+name: Gerar APK CLEAN STATE WATCH V1
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Aplicar cadeia antiga + CLEAN STATE WATCH V1
+        run: |
+          python3 scripts/patch_v07.py
+          python3 scripts/patch_v08.py
+          python3 scripts/patch_v09.py
+          python3 scripts/patch_v10.py
+          python3 scripts/patch_v11.py
+          python3 scripts/patch_v12.py
+          python3 scripts/patch_v13.py
+          python3 scripts/patch_v14.py
+          python3 scripts/patch_v15.py
+          python3 scripts/patch_v16.py
+          python3 scripts/patch_v17.py
+          python3 scripts/patch_v18.py
+          python3 scripts/patch_v19.py
+          python3 scripts/patch_v20.py
+          python3 scripts/patch_v19_final.py
+          python3 scripts/patch_v19_stop_after_send.py
+          python3 scripts/patch_v19_stop_read_fix.py
+          python3 scripts/patch_v19_first_route_timing_fix.py
+          python3 scripts/patch_v19_alerts_nonblocking.py
+          python3 scripts/patch_v19_processing_reset.py
+          python3 scripts/patch_v19_any_group.py
+          python3 scripts/patch_v19_keep_ocr_warm.py
+          python3 scripts/patch_v19_admin_locked_group.py
+          python3 scripts/patch_v19_admin_lock_stable.py
+          python3 scripts/patch_v19_admin_message_noise_fix.py
+          python3 scripts/patch_v19_direct_mediastore_watch.py
+          python3 scripts/patch_v19_mediastore_ignore_admin_toggle.py
+          python3 scripts/patch_v19_speed_diagnostic.py
+          python3 scripts/patch_v19_optimization1.py
+          python3 scripts/patch_v19_dense_row_recovery.py
+          python3 scripts/patch_v19_dense_recovery_compile_fix.py
+          python3 scripts/patch_v19_dense_cage_unicode_fix.py
+          python3 scripts/patch_v19_dense_recovery_marker.py
+          python3 scripts/patch_v19_dense_recovery_fast_hint.py
+          python3 scripts/patch_v19_dense_short_image.py
+          python3 scripts/patch_v19_media25_preocr10.py
+          python3 scripts/patch_v19_bairro_first_cage_second.py
+          python3 scripts/patch_v19_cage_narrow.py
+          python3 scripts/patch_v19_send_one_attempt.py
+          python3 scripts/patch_v19_send_one_click_poll.py
+          python3 scripts/patch_v19_send_wait_ready.py
+          python3 scripts/patch_v19_send_ready_media10_statuslean.py
+          python3 scripts/patch_v19_admin_ultra_10_6.py
+          python3 scripts/patch_v19_admin_ultra_direct_fast.py
+          python3 scripts/patch_v19_media10_statuslean_admin_direct_marker.py
+          python3 scripts/patch_v19_clean_state_watch_v1.py
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Instalar Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Configurar Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Compilar APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RotaRapida-APK-v0.19-CLEAN-STATE-WATCH-V1
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

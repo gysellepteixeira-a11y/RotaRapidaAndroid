@@ -1,4 +1,4 @@
-name: Gerar APK TEXT v6 + READ MORE FAST v10 + IMAGE v9
+name: Gerar APK TEXT v6 + READ MORE TREE v11 + IMAGE v9
 
 on:
   workflow_dispatch:
@@ -110,8 +110,10 @@ jobs:
         run: python3 scripts/patch_v19_text_first_old_base.py
       - name: Aplicar BULK PIXELS v9 apenas no scan da imagem
         run: python3 scripts/patch_v19_image_bulk_pixels_v9.py
-      - name: Abrir Ler mais antes do parser textual
+      - name: Abrir Ler mais antes do parser textual v10
         run: python3 scripts/patch_v19_text_read_more_fast_v10.py
+      - name: Corrigir Ler mais por arvore e reticencias v11
+        run: python3 scripts/patch_v19_text_read_more_tree_v11.py
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -130,6 +132,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-TEXT-v6-READ-MORE-v10-IMAGE-v9-DIAGNOSTIC
+          name: RotaRapida-APK-v0.19-TEXT-v6-READ-MORE-v11-IMAGE-v9-DIAGNOSTIC
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

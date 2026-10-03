@@ -14,10 +14,6 @@ for marker in required:
     if marker not in s:
         raise SystemExit('IMAGE DIRECT DIAG v8 wrong base / missing marker: ' + marker)
 
-# ---------------------------------------------------------------------------
-# Image diagnostic state. Kept entirely separate from td* so TEXT v6 behavior
-# stays byte-for-byte equivalent on its critical path.
-# ---------------------------------------------------------------------------
 field_anchor = '    private var tdHeld=0L; private var tdReleased=0L\n'
 if field_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: td field anchor not found')
@@ -31,11 +27,6 @@ fields = field_anchor + '''    private var idOn=false; private var idStart=0L; p
 '''
 s = s.replace(field_anchor, fields, 1)
 
-# ---------------------------------------------------------------------------
-# Begin the image trace at the MediaStore scan that actually found the file.
-# This avoids inventing an AccessibilityEvent timestamp for image routes, which
-# are detected by the 10ms MediaStore watcher.
-# ---------------------------------------------------------------------------
 start_anchor = '''        val media = findNewestWhatsAppImage() ?: return
         val mediaStoreMs = SystemClock.elapsedRealtime() - mediaStoreStarted
 
@@ -51,7 +42,6 @@ if start_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: MediaStore start anchor not found')
 s = s.replace(start_anchor, start_new, 1)
 
-# Bairro-first measurements: decode/scan + OCR finish point.
 bairro_anchor = '''                lastDensePriorityNeighborhood = chosen.neighborhood
                 lastDensePriorityIndex = chosen.priorityIndex
                 lastDensePriorityCenterY = chosen.centerY
@@ -71,7 +61,6 @@ if bairro_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: bairro anchor not found')
 s = s.replace(bairro_anchor, bairro_new, 1)
 
-# Gaiola/route-ready point for the fast dense path.
 cage_anchor = '''                    val route = RouteResult(
                         neighborhood = lastDensePriorityNeighborhood,
                         cage = cage!!,
@@ -99,8 +88,6 @@ if cage_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: gaiola anchor not found')
 s = s.replace(cage_anchor, cage_new, 1)
 
-# Any image fallback that eventually reaches sendRouteInCurrentChat still gets a
-# route-ready timestamp here. TEXT has idOn=false and pays only one branch.
 send_entry_anchor = '''    private fun sendRouteInCurrentChat(route: RouteResult) {
         if(tdOn && tdSend==0L) tdSend=SystemClock.elapsedRealtime()
 '''
@@ -118,7 +105,6 @@ if send_entry_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: send entry anchor not found')
 s = s.replace(send_entry_anchor, send_entry_new, 1)
 
-# Initial send tree/editor collection timing.
 collect_anchor = '''        val tdSc = if(tdOn) SystemClock.elapsedRealtime() else 0L
         val items = collectNodeItems(root)
         if(tdOn && tdSc>0L) tdSendCollect += SystemClock.elapsedRealtime()-tdSc
@@ -140,7 +126,6 @@ if collect_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: send collect anchor not found')
 s = s.replace(collect_anchor, collect_new, 1)
 
-# ACTION_SET_TEXT timing.
 set_anchor = '''        val tdSs = if(tdOn) SystemClock.elapsedRealtime() else 0L
         val setOk = editor.node.performAction(
             AccessibilityNodeInfo.ACTION_SET_TEXT,
@@ -161,8 +146,6 @@ if set_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: setText anchor not found')
 s = s.replace(set_anchor, set_new, 1)
 
-# Direct named Enviar/Send for IMAGE. Same 4ms strategy as TEXT v5, with old
-# SEND READY preserved as fallback if WhatsApp does not expose the named node.
 current_editor_anchor = '    private fun currentEditorText(items: List<NodeItem>): String {\n'
 if current_editor_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: currentEditorText anchor not found')
@@ -202,7 +185,6 @@ helper = r'''    private fun waitForImageDirectSendReadyV8(
                 return
             }
 
-            // No accepted click yet; safe to use the original single-attempt fallback.
             tryClickSend(route, 0)
             return
         }
@@ -221,8 +203,6 @@ helper = r'''    private fun waitForImageDirectSendReadyV8(
 '''
 s = s.replace(current_editor_anchor, helper + current_editor_anchor, 1)
 
-# Change only the non-text branch: v6 TEXT DIRECT remains untouched; image now
-# goes direct, while any unrelated path keeps the old delayed SEND READY.
 postfill_anchor = '''        if (tdOn) {
             waitForTextDirectSendReadyV5(
                 route,
@@ -274,8 +254,6 @@ if postfill_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: post-fill branch anchor not found')
 s = s.replace(postfill_anchor, postfill_new, 1)
 
-# Record accepted ACTION_CLICK regardless of whether the image used normal direct
-# send or ADMIN direct while a group was locked. td* instrumentation remains as-is.
 click_start_anchor = '''    private fun clickNodeOrParent(start: AccessibilityNodeInfo): Boolean {
         val t=if(tdOn) SystemClock.elapsedRealtime() else 0L
 '''
@@ -309,8 +287,6 @@ if click_final_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: click final anchor not found')
 s = s.replace(click_final_anchor, click_final_new, 1)
 
-# Confirmation collection timing. This is after the click and therefore does not
-# affect the race, but lets the report match the TEXT diagnostic detail.
 confirm_anchor = '''        val tdFc = if(tdOn) SystemClock.elapsedRealtime() else 0L
         val items = collectNodeItems(root)
         if(tdOn && tdFc>0L){ tdConfirmCollect += SystemClock.elapsedRealtime()-tdFc; tdConfirmPoll=poll }
@@ -336,7 +312,6 @@ if confirm_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: confirm anchor not found')
 s = s.replace(confirm_anchor, confirm_new, 1)
 
-# Reset a failed image trace so it can never leak into a later text route.
 failure_anchor = '''    private fun finishFileOnlyFailure(message: String) {
         processing = false
         Prefs.setStatus(this, message)
@@ -350,7 +325,6 @@ if failure_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: failure anchor not found')
 s = s.replace(failure_anchor, failure_new, 1)
 
-# Image report helpers inserted next to the existing tdReport/format helpers.
 format_anchor = '    private fun formatElapsedMs(ms: Long): String {\n'
 if format_anchor not in s:
     raise SystemExit('IMAGE DIRECT DIAG v8: formatElapsedMs anchor not found')
@@ -398,14 +372,13 @@ report_helpers = r'''    private fun idBegin(start:Long, found:Long, mediaMs:Lon
 '''
 s = s.replace(format_anchor, report_helpers + format_anchor, 1)
 
-# Finalize the detailed image report after the existing CONFIRMADO status. TEXT
-# tdReport still executes independently when tdOn=true.
 mark_anchor = '''        Prefs.setStatus(
             this,
             "CONFIRMADO: ${route.neighborhood} -> ${route.cage} | " +
                 "envio=${formatElapsedMs(sendStageMs)} | tentativas=${speedDiagnosticSendAttempts} | " +
                 "metodo=${speedDiagnosticSendMethod} | app=${formatElapsedMs(elapsed)}"
         )
+        if(tdOn){ tdConfirmed=SystemClock.elapsedRealtime(); tdReport(route) }
         speedDiagnosticSendStartedAt = 0L
 '''
 mark_new = '''        Prefs.setStatus(
@@ -414,6 +387,7 @@ mark_new = '''        Prefs.setStatus(
                 "envio=${formatElapsedMs(sendStageMs)} | tentativas=${speedDiagnosticSendAttempts} | " +
                 "metodo=${speedDiagnosticSendMethod} | app=${formatElapsedMs(elapsed)}"
         )
+        if(tdOn){ tdConfirmed=SystemClock.elapsedRealtime(); tdReport(route) }
         if(idOn){
             if(idConfirmed==0L) idConfirmed=SystemClock.elapsedRealtime()
             idReport(route)

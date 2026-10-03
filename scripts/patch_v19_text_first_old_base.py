@@ -120,3 +120,7 @@ runpy.run_path('scripts/patch_v19_text_raw_delta_v4.py', run_name='__main__')
 # v5 changes only the post-fill send path for text routes: direct named Enviar/Send
 # lookup every 4ms, one accepted ACTION_CLICK, old SEND READY kept for images/fallback.
 runpy.run_path('scripts/patch_v19_text_direct_send_v5.py', run_name='__main__')
+
+# v6 keeps DIRECT SEND v5 and changes only the pre-parser delta scan: it scans
+# the newest tail of the chat instead of rebuilding the raw set for the whole tree.
+runpy.run_path('scripts/patch_v19_text_tail_delta_v6.py', run_name='__main__')

@@ -119,9 +119,10 @@ runpy.run_path('scripts/patch_v19_text_raw_delta_v4.py', run_name='__main__')
 # v5: direct named Enviar/Send lookup every 4ms for text routes.
 runpy.run_path('scripts/patch_v19_text_direct_send_v5.py', run_name='__main__')
 
-# v6: scan only the newest tail of the chat before the parser.
+# v6: scan only the newest tail of the chat before the parser. This is the text
+# version kept by the user; v7 is intentionally NOT applied.
 runpy.run_path('scripts/patch_v19_text_tail_delta_v6.py', run_name='__main__')
 
-# v7: keep the same v6 tail/parser/direct-send behavior, but stop copying the
-# entire raw baseline before sending; add only the new keys in-place.
-runpy.run_path('scripts/patch_v19_text_mutable_baseline_v7.py', run_name='__main__')
+# v8: leave TEXT v6 untouched and add direct send + detailed diagnostic only to
+# image routes.
+runpy.run_path('scripts/patch_v19_image_direct_send_diag_v8.py', run_name='__main__')

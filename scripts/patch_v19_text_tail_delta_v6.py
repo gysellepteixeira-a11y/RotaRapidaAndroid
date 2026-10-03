@@ -118,12 +118,12 @@ for marker in checks:
     if marker not in s:
         raise SystemExit('TEXT TAIL DELTA v6 verification failed: ' + marker)
 
-# Strong A/B safety checks: successful text hot path must not rebuild the full set,
-# and DIRECT SEND v5 must remain present and untouched.
+# Strong A/B safety checks: inspect only the successful hot block, stopping
+# before the explicit full-baseline fallback.
 start = s.find('if (primed && Prefs.searchArmed(this) && tfNewItems.isNotEmpty())')
-end = s.find('val currentSignatures = textSignatures(items)', start)
+end = s.find('// Apenas quando o TAIL FAST nao produziu uma rota valida', start)
 if start < 0 or end < 0:
-    raise SystemExit('TEXT TAIL DELTA v6 could not isolate hot segment')
+    raise SystemExit('TEXT TAIL DELTA v6 could not isolate successful hot segment')
 segment = s[start:end]
 if 'items.asSequence()' in segment:
     raise SystemExit('TEXT TAIL DELTA v6 full baseline leaked into successful hot segment')

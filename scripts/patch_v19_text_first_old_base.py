@@ -99,7 +99,6 @@ if old_header not in s:
     raise SystemExit('TEXT FAST SIGNATURE diagnostic header v1 not found')
 s = s.replace(old_header, new_header, 1)
 
-# Verificacoes fortes para nao gerar outro APK ambiguo.
 checks = [
     'val currentSignatures = LinkedHashSet<String>(items.size)',
     'val tfNewItems = ArrayList<NodeItem>(8)',
@@ -112,15 +111,17 @@ for marker in checks:
 S.write_text(s, encoding='utf-8')
 print('TEXT FIRST + FAST SIGNATURE aplicado: uma normalizacao por item; envio inalterado')
 
-# v4 is a second, isolated A/B on top of v3: successful text routes use a
-# cheap exact-text delta and skip global normalization. Image fallback remains old behavior.
 import runpy
+
+# v4: successful text routes use a cheap exact-text delta and skip global normalization.
 runpy.run_path('scripts/patch_v19_text_raw_delta_v4.py', run_name='__main__')
 
-# v5 changes only the post-fill send path for text routes: direct named Enviar/Send
-# lookup every 4ms, one accepted ACTION_CLICK, old SEND READY kept for images/fallback.
+# v5: direct named Enviar/Send lookup every 4ms for text routes.
 runpy.run_path('scripts/patch_v19_text_direct_send_v5.py', run_name='__main__')
 
-# v6 keeps DIRECT SEND v5 and changes only the pre-parser delta scan: it scans
-# the newest tail of the chat instead of rebuilding the raw set for the whole tree.
+# v6: scan only the newest tail of the chat before the parser.
 runpy.run_path('scripts/patch_v19_text_tail_delta_v6.py', run_name='__main__')
+
+# v7: keep the same v6 tail/parser/direct-send behavior, but stop copying the
+# entire raw baseline before sending; add only the new keys in-place.
+runpy.run_path('scripts/patch_v19_text_mutable_baseline_v7.py', run_name='__main__')

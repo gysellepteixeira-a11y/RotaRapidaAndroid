@@ -116,3 +116,7 @@ print('TEXT FIRST + FAST SIGNATURE aplicado: uma normalizacao por item; envio in
 # cheap exact-text delta and skip global normalization. Image fallback remains old behavior.
 import runpy
 runpy.run_path('scripts/patch_v19_text_raw_delta_v4.py', run_name='__main__')
+
+# v5 changes only the post-fill send path for text routes: direct named Enviar/Send
+# lookup every 4ms, one accepted ACTION_CLICK, old SEND READY kept for images/fallback.
+runpy.run_path('scripts/patch_v19_text_direct_send_v5.py', run_name='__main__')

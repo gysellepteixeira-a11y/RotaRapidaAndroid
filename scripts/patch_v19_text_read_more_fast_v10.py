@@ -9,12 +9,13 @@ required = [
     'val tfNewItems = tfNewItemsReverse.asReversed()',
     'private fun clickNodeOrParent(',
     'private fun waitForTextDirectSendReadyV5(',
+    'appendLine("RESUMO")',
 ]
 for marker in required:
     if marker not in s:
         raise SystemExit('READ MORE FAST v10 wrong base / missing marker: ' + marker)
 
-# State carried only between the first new-message event and the expanded-tree parse.
+# Estado temporario entre o primeiro evento da mensagem truncada e a arvore expandida.
 state_anchor = '    private var tdHeld=0L; private var tdReleased=0L\n'
 state_insert = '''    private var tdHeld=0L; private var tdReleased=0L
     private var rmPending=false; private var rmCarry=false; private var rmUsed=false
@@ -27,8 +28,8 @@ if state_anchor not in s:
     raise SystemExit('READ MORE FAST v10 state anchor not found')
 s = s.replace(state_anchor, state_insert, 1)
 
-# While waiting for the bubble to expand, ignore the accessibility-event storm.
-# This preserves the original event timestamp and avoids parsing the truncated tree.
+# Enquanto o balao expande, ignora a tempestade de eventos do WhatsApp.
+# Preserva o timestamp do primeiro evento para medir o custo real do Ler mais.
 event_old = '''        if (processing) return
         if (!analyzeScheduled) tdCandidate = SystemClock.elapsedRealtime()
         scheduleAnalyze(12L)
@@ -47,8 +48,8 @@ if event_old not in s:
     raise SystemExit('READ MORE FAST v10 event anchor not found')
 s = s.replace(event_old, event_new, 1)
 
-# Fast lookup by accessibility text. We still require the node to overlap the vertical
-# band of the NEW tail items, so an old "Ler mais" higher in the chat is not clicked.
+# Procura direta por Ler mais/Read more, restrita a faixa vertical dos itens NOVOS.
+# Assim nao clica em Ler mais antigo que ficou mais acima na conversa.
 helper_anchor = '    private fun waitForTextDirectSendReadyV5(\n'
 helper = r'''    private fun findNewestReadMoreV10(
         root: AccessibilityNodeInfo,
@@ -89,7 +90,9 @@ helper = r'''    private fun findNewestReadMoreV10(
                     }
                 }
                 val n = RouteParser.normalize(merged)
-                val isReadMore = n == "ler mais" || n == "read more" || n.endsWith(" ler mais") || n.endsWith(" read more")
+                val isReadMore =
+                    n == "ler mais" || n == "read more" ||
+                    n.endsWith(" ler mais") || n.endsWith(" read more")
                 if (!isReadMore) continue
 
                 if (rect.bottom > bestBottom) {
@@ -120,7 +123,9 @@ helper = r'''    private fun findNewestReadMoreV10(
                     }
                 }
                 val n = RouteParser.normalize(merged)
-                stillReadMore = n == "ler mais" || n == "read more" || n.endsWith(" ler mais") || n.endsWith(" read more")
+                stillReadMore =
+                    n == "ler mais" || n == "read more" ||
+                    n.endsWith(" ler mais") || n.endsWith(" read more")
             }
         } catch (_: Throwable) {
             stillReadMore = false
@@ -131,7 +136,7 @@ helper = r'''    private fun findNewestReadMoreV10(
             rmPolls = poll
             rmPending = false
             rmCarry = true
-            // Parse immediately from the expanded tree; no fixed 100/200ms sleep.
+            // Sem espera fixa: rele a arvore assim que o no Ler mais some/muda.
             handler.post { analyzeCurrentWindow() }
             return
         }
@@ -147,17 +152,16 @@ if helper_anchor not in s:
     raise SystemExit('READ MORE FAST v10 helper anchor not found')
 s = s.replace(helper_anchor, helper + helper_anchor, 1)
 
-# v6 has already isolated the newest text tail. Before giving that tail to the parser,
-# expand only a Read-more node that belongs to the same vertical band.
+# O TAIL v6 ja isolou a cauda da mensagem nova. Antes de chamar o parser,
+# expande Ler mais apenas se ele estiver nessa mesma cauda.
 hot_anchor = '''        val tfNewItems = tfNewItemsReverse.asReversed()
 
         // Tenta a rota textual antes de qualquer varredura global/preparo de imagem.
 '''
 hot_insert = '''        val tfNewItems = tfNewItemsReverse.asReversed()
 
-        // READ MORE FAST v10: never choose a priority from a truncated newest bubble.
-        // No cost beyond one direct text lookup when the newest tail exists; normal
-        // messages continue straight to the v6 parser.
+        // READ MORE FAST v10: nunca escolhe prioridade usando balao novo truncado.
+        // Mensagens sem Ler mais seguem direto para o parser v6.
         if (primed && Prefs.searchArmed(this) && tfNewItems.isNotEmpty() && !rmPending && !rmCarry) {
             val readMoreNode = findNewestReadMoreV10(root, tfNewItems)
             if (readMoreNode != null) {
@@ -176,8 +180,8 @@ hot_insert = '''        val tfNewItems = tfNewItemsReverse.asReversed()
                     waitForReadMoreExpansionV10(readMoreNode, started, 0)
                     return
                 }
-                // Safety over speed: if WhatsApp exposes Ler mais but refuses the click,
-                // do not send from a potentially truncated priority list. Retry shortly.
+                // Se existe Ler mais mas o WhatsApp recusou o clique, nao manda uma
+                // prioridade potencialmente incompleta. Tenta reler logo depois.
                 handler.postDelayed({ analyzeCurrentWindow() }, 20L)
                 return
             }
@@ -189,7 +193,7 @@ if hot_anchor not in s:
     raise SystemExit('READ MORE FAST v10 hot anchor not found')
 s = s.replace(hot_anchor, hot_insert, 1)
 
-# Copy Read-more timing into the route diagnostic before clearing the carry state.
+# Leva os tempos do Ler mais para o diagnostico da rota antes de limpar o estado.
 tdbegin_old = '''    private fun tdBegin(e:Long,a:Long,cd:Long,c:Long,pa:Long,ro:Long,ni:Int){
         tdOn=true; tdEvent=e; tdAnalyze=a; tdCollectDone=cd; tdCollect=c; tdParse=pa; tdRoute=ro; tdNewItems=ni
 '''
@@ -202,34 +206,35 @@ if tdbegin_old not in s:
     raise SystemExit('READ MORE FAST v10 tdBegin anchor not found')
 s = s.replace(tdbegin_old, tdbegin_new, 1)
 
-# Add explicit timing lines to the text diagnostic and update its header.
 header_old = '===== DIAGNOSTICO TEXTO v6 | OLD BASE + TEXT TAIL DELTA + DIRECT SEND ====='
 header_new = '===== DIAGNOSTICO TEXTO v10 | TEXT v6 + READ MORE FAST + DIRECT SEND ====='
 s = s.replace(header_old, header_new, 1)
 
-report_anchor = '''            append("[${tdA(tdCollectDone)}] Arvore inicial coletada | collect=${tdCollect}ms\\n")
-            append("[${tdA(tdRoute)}] Rota: ${route.neighborhood} -> ${route.cage} | parser=${tdParse}ms | newItems=$tdNewItems\\n")
+# O compile-fix usa appendLine(). Acrescenta o custo do Ler mais sem mexer nos
+# demais timestamps da v6.
+report_anchor = '''            appendLine("[${tdA(tdCollectDone)}] Arvore inicial coletada | collect=${tdCollect}ms")
+            appendLine("[${tdA(tdRoute)}] Rota: ${route.neighborhood} -> ${route.cage} | parser=${tdParse}ms | newItems=$tdNewItems")
 '''
-report_replacement = '''            append("[${tdA(tdCollectDone)}] Arvore inicial coletada | collect=${tdCollect}ms\\n")
+report_replacement = '''            appendLine("[${tdA(tdCollectDone)}] Arvore inicial coletada | collect=${tdCollect}ms")
             if(tdReadMoreUsed){
-                append("[${tdA(tdReadMoreClicked)}] Ler mais clicado | action=${tdReadMoreClickMs}ms\\n")
-                append("[${tdA(tdReadMoreExpanded)}] Conteudo expandido | click->expand=${tdD(tdReadMoreClicked,tdReadMoreExpanded)} | polls=$tdReadMorePolls\\n")
+                appendLine("[${tdA(tdReadMoreClicked)}] Ler mais clicado | action=${tdReadMoreClickMs}ms")
+                appendLine("[${tdA(tdReadMoreExpanded)}] Conteudo expandido | click->expand=${tdD(tdReadMoreClicked,tdReadMoreExpanded)} | polls=$tdReadMorePolls")
             }
-            append("[${tdA(tdRoute)}] Rota: ${route.neighborhood} -> ${route.cage} | parser=${tdParse}ms | newItems=$tdNewItems\\n")
+            appendLine("[${tdA(tdRoute)}] Rota: ${route.neighborhood} -> ${route.cage} | parser=${tdParse}ms | newItems=$tdNewItems")
 '''
 if report_anchor not in s:
-    raise SystemExit('READ MORE FAST v10 report anchor not found')
+    raise SystemExit('READ MORE FAST v10 appendLine report anchor not found')
 s = s.replace(report_anchor, report_replacement, 1)
 
-summary_anchor = '''            append("evento->confirm=${tdD(tdEvent,tdConfirmed)}\\n")
+summary_anchor = '''            appendLine("evento->confirm=${tdD(tdEvent,tdConfirmed)}")
             append("collectTotal=${tdCollect+tdSendCollect+tdReadyCollect+tdClickCollect+tdConfirmCollect}ms | statusWrites=${tdStatusTexto+tdStatusEnvio+tdStatusReady}ms")
 '''
-summary_replacement = '''            append("evento->confirm=${tdD(tdEvent,tdConfirmed)}\\n")
-            if(tdReadMoreUsed) append("readMore=${tdD(tdReadMoreClicked,tdReadMoreExpanded)} | readMoreAction=${tdReadMoreClickMs}ms | readMorePolls=$tdReadMorePolls\\n")
+summary_replacement = '''            appendLine("evento->confirm=${tdD(tdEvent,tdConfirmed)}")
+            if(tdReadMoreUsed) appendLine("readMore=${tdD(tdReadMoreClicked,tdReadMoreExpanded)} | readMoreAction=${tdReadMoreClickMs}ms | readMorePolls=$tdReadMorePolls")
             append("collectTotal=${tdCollect+tdSendCollect+tdReadyCollect+tdClickCollect+tdConfirmCollect}ms | statusWrites=${tdStatusTexto+tdStatusEnvio+tdStatusReady}ms")
 '''
 if summary_anchor not in s:
-    raise SystemExit('READ MORE FAST v10 summary anchor not found')
+    raise SystemExit('READ MORE FAST v10 appendLine summary anchor not found')
 s = s.replace(summary_anchor, summary_replacement, 1)
 
 for marker in [

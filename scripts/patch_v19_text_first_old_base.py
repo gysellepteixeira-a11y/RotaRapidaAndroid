@@ -111,3 +111,8 @@ for marker in checks:
 
 S.write_text(s, encoding='utf-8')
 print('TEXT FIRST + FAST SIGNATURE aplicado: uma normalizacao por item; envio inalterado')
+
+# v4 is a second, isolated A/B on top of v3: successful text routes use a
+# cheap exact-text delta and skip global normalization. Image fallback remains old behavior.
+import runpy
+runpy.run_path('scripts/patch_v19_text_raw_delta_v4.py', run_name='__main__')

@@ -16,10 +16,6 @@ for m in required:
     if m not in s:
         raise SystemExit('READ MORE DESC DIRECT v14 wrong base: '+m)
 
-# WhatsApp exposes the real control as a separate android.view.View whose
-# contentDescription is "Ler mais" / "Read more". It is clickable and supports
-# ACTION_CLICK, but findAccessibilityNodeInfosByText() does not return it.
-# Traverse the fresh tree directly and pick the lowest visible exact description.
 needle='    private fun findNewestReadMoreTargetV12(newItems:List<NodeItem>):NodeItem? {'
 helper=r'''    private data class ReadMoreDescTargetV14(
         val node:AccessibilityNodeInfo,
@@ -57,9 +53,6 @@ helper=r'''    private data class ReadMoreDescTargetV14(
 '''
 s=s.replace(needle,helper+needle,1)
 
-# Exact desc-node path runs before all v12 fallbacks. This avoids coordinate
-# gestures and avoids text-query APIs; one ACTION_CLICK, then the existing v12
-# fresh-tree growth verification decides when the parser may continue.
 needle_hot='            val readMoreTarget=findNewestReadMoreTargetV12(tfNewItems)\n'
 hot=r'''            val descTarget=findNewestReadMoreDescTargetV14()
             if(descTarget!=null){
@@ -96,3 +89,6 @@ for m in [
 
 S.write_text(s,encoding='utf-8')
 print('READ MORE DESC DIRECT v14 applied: exact contentDescription node + ACTION_CLICK + verified expansion; TEXT v6 + IMAGE v9 preserved')
+
+# Immediately layer the v15 race fix on top when this build step runs.
+exec(Path('scripts/patch_v19_text_read_more_newitem_guard_v15.py').read_text(encoding='utf-8'), {'__name__':'__main__'})

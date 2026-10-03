@@ -12,8 +12,6 @@ for m in [
  '===== DIAGNOSTICO IMAGEM v9 | BAIRRO FIRST + GAIOLA NARROW + DIRECT SEND + BULK PIXELS =====']:
     if m not in s: raise SystemExit('READ MORE SPAN v11 wrong base: '+m)
 
-# Replace the entire old Read-more helper region, so this patch does not depend on
-# formatting details of the v10 polling helper.
 a=s.find('    private fun findNewestReadMoreV10(')
 b=s.find('    private fun waitForTextDirectSendReadyV5(',a)
 if a<0 or b<0: raise SystemExit('READ MORE SPAN v11 helper region not found')
@@ -34,7 +32,7 @@ helpers=r'''    private fun isReadMoreLabelV11(raw:String):Boolean {
                 val label=if(y>x) sp.subSequence(x,y).toString() else ""
                 val tail=(raw.contains("...")||raw.contains("…")) && y>=sp.length-2
                 if(!isReadMoreLabelV11(label) && !tail) continue
-                try { span.onClick(null); return item.node to raw } catch(_:Throwable){}
+                try { span.onClick(android.view.View(this)); return item.node to raw } catch(_:Throwable){}
             }
         }
         return null
@@ -81,7 +79,6 @@ helpers=r'''    private fun isReadMoreLabelV11(raw:String):Boolean {
 '''
 s=s[:a]+helpers+s[b:]
 
-# Replace the v10 hot block by position rather than matching all comments/whitespace.
 hs=s.find('            val readMoreNode = findNewestReadMoreV10(root, tfNewItems)')
 he=s.find('        // Tenta a rota textual antes de qualquer varredura global/preparo de imagem.',hs)
 if hs<0 or he<0: raise SystemExit('READ MORE SPAN v11 hot region not found')
@@ -116,6 +113,7 @@ hot=r'''            val spanClick=clickNewestReadMoreSpanV11(tfNewItems)
                 handler.postDelayed({analyzeCurrentWindow()},12L)
                 return
             }
+        }
 
 '''
 s=s[:hs]+hot+s[he:]

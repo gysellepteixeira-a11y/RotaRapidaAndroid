@@ -3,6 +3,11 @@ from pathlib import Path
 S=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt')
 s=S.read_text(encoding='utf-8')
 
+v15_header='===== DIAGNOSTICO TEXTO v15 | TEXT v6 + READ MORE NEWITEM GUARD + DIRECT SEND ====='
+if v15_header in s:
+    print('READ MORE NEWITEM GUARD v15 already applied; keeping current source')
+    raise SystemExit(0)
+
 required=[
     '===== DIAGNOSTICO TEXTO v14 | TEXT v6 + READ MORE DESC DIRECT + DIRECT SEND =====',
     'private data class ReadMoreDescTargetV14(',
@@ -90,7 +95,7 @@ if old not in s:
 s=s.replace(old,new,1)
 
 old_header='===== DIAGNOSTICO TEXTO v14 | TEXT v6 + READ MORE DESC DIRECT + DIRECT SEND ====='
-new_header='===== DIAGNOSTICO TEXTO v15 | TEXT v6 + READ MORE NEWITEM GUARD + DIRECT SEND ====='
+new_header=v15_header
 s=s.replace(old_header,new_header,1)
 
 for m in [

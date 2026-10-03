@@ -14,8 +14,6 @@ for marker in required:
     if marker not in s:
         raise SystemExit('READ MORE TREE v11 wrong base / missing marker: ' + marker)
 
-# Replace v10 lookup helper with a tree-scan helper. collectNodeItems already contains
-# node.text + contentDescription, even when WhatsApp text search does not index the span.
 start = s.find('    private fun findNewestReadMoreV10(')
 end = s.find('    private fun waitForReadMoreExpansionV10(', start)
 if start < 0 or end < 0:
@@ -81,31 +79,26 @@ helper = r'''    private fun findNewestReadMoreV11(
 '''
 s = s[:start] + helper + s[end:]
 
-# Expansion polling now also understands an ellipsis probe node used by the coordinate fallback.
 s = s.replace(
     'private fun waitForReadMoreExpansionV10(',
     'private fun waitForReadMoreExpansionV11(',
     1
 )
 s = s.replace(
-    '{ waitForReadMoreExpansionV10(clickedNode, startedAt, poll + 1) }',
-    '{ waitForReadMoreExpansionV11(clickedNode, startedAt, poll + 1) }',
+    'waitForReadMoreExpansionV10(clickedNode, startedAt, poll + 1)',
+    'waitForReadMoreExpansionV11(clickedNode, startedAt, poll + 1)',
     1
 )
-old_still = '''                val n = RouteParser.normalize(merged)
-                stillReadMore = n == "ler mais" || n == "read more" || n.endsWith(" ler mais") || n.endsWith(" read more")
-'''
-new_still = '''                val n = RouteParser.normalize(merged)
-                stillReadMore =
+
+old_expr = 'stillReadMore = n == "ler mais" || n == "read more" || n.endsWith(" ler mais") || n.endsWith(" read more")'
+new_expr = '''stillReadMore =
                     n == "ler mais" || n == "read more" ||
                     n.endsWith(" ler mais") || n.endsWith(" read more") ||
-                    merged.contains("...") || merged.contains("…")
-'''
-if old_still not in s:
-    raise SystemExit('READ MORE TREE v11 expansion condition not found')
-s = s.replace(old_still, new_still, 1)
+                    merged.contains("...") || merged.contains("…")'''
+if old_expr not in s:
+    raise SystemExit('READ MORE TREE v11 expansion expression not found')
+s = s.replace(old_expr, new_expr, 1)
 
-# Replace only the detection/click portion in the v10 hot path.
 old_hot = '''            val readMoreNode = findNewestReadMoreV10(root, tfNewItems)
             if (readMoreNode != null) {
                 val started = SystemClock.elapsedRealtime()
@@ -150,9 +143,6 @@ new_hot = '''            val readMoreItem = findNewestReadMoreV11(items, tfNewIt
                 return
             }
 
-            // Some WhatsApp builds render "Ler mais" as an inline span that does not
-            // appear as an individually searchable accessibility node. In that case,
-            // the visible truncation (...) is our anchor: tap immediately to its right.
             val ellipsisItem = findNewestEllipsisV11(tfNewItems)
             if (ellipsisItem != null) {
                 val started = SystemClock.elapsedRealtime()
@@ -170,7 +160,6 @@ new_hot = '''            val readMoreItem = findNewestReadMoreV11(items, tfNewIt
                     waitForReadMoreExpansionV11(ellipsisItem.node, started, 0)
                     return
                 }
-                // Do not parse/send a known truncated newest message.
                 handler.postDelayed({ analyzeCurrentWindow() }, 12L)
                 return
             }

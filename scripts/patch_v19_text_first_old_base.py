@@ -1,16 +1,22 @@
 from pathlib import Path
 
 S = Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt')
+P = Path('app/src/main/java/com/gy/rotarapida/Prefs.kt')
 s = S.read_text(encoding='utf-8')
+p = P.read_text(encoding='utf-8')
 
-required = [
+required_service = [
     'private var tdCandidate=0L',
     'private fun tdBegin(',
-    'MEDIA10 STATUSLEAN ADMIN ULTRA DIRECT FAST',
+    'private const val DIRECT_MEDIASTORE_WATCH_MS = 10L',
+    'private const val PENDING_ROUTE_SEND_WATCH_MS = 10L',
+    'private fun findAdminUltraSendNodeFast(',
 ]
-for marker in required:
+for marker in required_service:
     if marker not in s:
-        raise SystemExit('TEXT FIRST wrong base / missing marker: ' + marker)
+        raise SystemExit('TEXT FIRST wrong base / missing service marker: ' + marker)
+if 'MEDIA10 STATUSLEAN ADMIN ULTRA DIRECT FAST' not in p:
+    raise SystemExit('TEXT FIRST wrong base / missing Prefs marker')
 
 anchor = '''        val currentSignatures = textSignatures(items)
         val currentImageCandidates = findImageCandidates(items)
@@ -79,8 +85,6 @@ insert = '''        val currentSignatures = textSignatures(items)
 '''
 
 s = s.replace(anchor, insert, 1)
-
-# Identifica claramente o A/B no relatorio, sem alterar a logica do diagnostico.
 s = s.replace(
     '===== DIAGNOSTICO TEXTO v1 | OLD BASE =====',
     '===== DIAGNOSTICO TEXTO v2 | OLD BASE + TEXT FIRST ====='

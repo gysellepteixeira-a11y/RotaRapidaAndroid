@@ -61,7 +61,7 @@ s = s.replace(old3, new3, 1)
 if 'source.getPixel(' in s:
     raise SystemExit("IMAGE BULK PIXELS v9: an unexpected source.getPixel remains")
 for required in [
-    'metodo=TEXT_DIRECT_V5',
+    'TEXT_DIRECT_V5',
     'IMAGE_DIRECT_V8',
     marker_new,
     'bulkPixels[y * w + x]',

@@ -27,10 +27,28 @@ if state_anchor not in s:
     raise SystemExit('v37 admin state anchor not found')
 s=s.replace(state_anchor,state_insert,1)
 
+# Replace EXACTLY isAdminLockedGroup(), using brace matching. Do not delete any
+# helper that later patches may have inserted between this function and the next
+# historically-known function (e.g. direct MediaStore helpers).
 start=s.find('    private fun isAdminLockedGroup(items: List<NodeItem>): Boolean {')
-end=s.find('\n    private fun keepOcrEngineWarm() {',start)
-if start<0 or end<0:
-    raise SystemExit(f'v37 isAdminLockedGroup region not found: {start} {end}')
+if start<0:
+    raise SystemExit('v37 isAdminLockedGroup start not found')
+open_brace=s.find('{',start)
+if open_brace<0:
+    raise SystemExit('v37 isAdminLockedGroup opening brace not found')
+depth=0
+end=-1
+for i in range(open_brace,len(s)):
+    ch=s[i]
+    if ch=='{':
+        depth+=1
+    elif ch=='}':
+        depth-=1
+        if depth==0:
+            end=i+1
+            break
+if end<0:
+    raise SystemExit('v37 isAdminLockedGroup closing brace not found')
 
 new_helper=r'''    private fun isAdminLockedGroup(items: List<NodeItem>): Boolean {
         val allVisibleText = items.asSequence()
@@ -114,8 +132,7 @@ new_helper=r'''    private fun isAdminLockedGroup(items: List<NodeItem>): Boolea
 
         rmV37AdminLockSource=if(locked) "CONFIG_LOCKED" else "NONE"
         return locked
-    }
-'''
+    }'''
 s=s[:start]+new_helper+s[end:]
 
 admin_old='''        val adminLockedGroupNow = if(messageEditorAvailable){
@@ -164,10 +181,11 @@ for m in [
     'normalizeV36=$tdV36NormalizeDiag',
     'localProofV33=calls=$tdV33LocalCalls',
     'speedDiagnosticSendMethod = "TEXT_DIRECT_V5"',
+    'checkDirectMediaStoreImage(',
     '===== DIAGNOSTICO IMAGEM v9 | BAIRRO FIRST + GAIOLA NARROW + DIRECT SEND + BULK PIXELS =====',
 ]:
     if m not in s:
         raise SystemExit('ADMIN CLOSED READ FIX v37 verify failed: '+m)
 
 S.write_text(s,encoding='utf-8')
-print('ADMIN CLOSED READ FIX v37 applied: direct live admin-lock banner + existing latest-config fallback; sticky state/pending watcher preserved; open-chat hot path unchanged')
+print('ADMIN CLOSED READ FIX v37 applied: direct live admin-lock banner + existing latest-config fallback; exact function replacement; MediaStore helpers preserved; pending watcher preserved')

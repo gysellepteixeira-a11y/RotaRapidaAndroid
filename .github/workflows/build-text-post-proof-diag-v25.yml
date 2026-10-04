@@ -6,6 +6,7 @@ on:
     branches:
       - main
 
+# trigger v25 post-proof diagnostic build
 jobs:
   build:
     runs-on: ubuntu-latest

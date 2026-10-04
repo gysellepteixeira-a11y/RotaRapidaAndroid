@@ -21,30 +21,18 @@ for m in required:
     if m not in s:
         raise SystemExit('ADMIN CLOSED READ FIX v37 wrong base: '+m)
 
-# Track how the closed-group state was recognized so the final diagnostic can
-# prove whether the route was captured from the direct WhatsApp restriction banner
-# or from the historical group-settings system notice.
 state_anchor='    private var adminLockedConversationActive = false\n'
 state_insert=state_anchor+'    private var rmV37AdminLockSource="NONE"\n    private var tdV37AdminLockSource="NONE"\n'
 if state_anchor not in s:
     raise SystemExit('v37 admin state anchor not found')
 s=s.replace(state_anchor,state_insert,1)
 
-# Replace only the admin-lock detector. Keep the existing system-message noise
-# protection, but restore support for the live composer-disabled banner such as
-# "Somente admins podem enviar mensagens". NodeItem.text already merges text and
-# contentDescription, so this covers both accessibility representations.
 start=s.find('    private fun isAdminLockedGroup(items: List<NodeItem>): Boolean {')
 end=s.find('\n    private fun keepOcrEngineWarm() {',start)
 if start<0 or end<0:
     raise SystemExit(f'v37 isAdminLockedGroup region not found: {start} {end}')
 
 new_helper=r'''    private fun isAdminLockedGroup(items: List<NodeItem>): Boolean {
-        // 1) LIVE BANNER / COMPOSER-DISABLED TEXT.
-        // The WhatsApp UI may expose "Somente admins podem enviar mensagens"
-        // without a preceding "X mudou as configuracoes..." system notice.
-        // The previous noise fix only recognized the latter, causing closed chats
-        // to be mistaken for the conversation list and swallowing the route.
         val allVisibleText = items.asSequence()
             .map { RouteParser.normalize(it.text) }
             .filter { it.isNotBlank() }
@@ -81,8 +69,6 @@ new_helper=r'''    private fun isAdminLockedGroup(items: List<NodeItem>): Boolea
             }
         }
 
-        // 2) EXISTING NOISE-SAFE FALLBACK: use the lowest/latest group-settings
-        // system notice. This preserves the old protection against stale notices.
         val latest = items.asSequence()
             .map { item ->
                 val own = RouteParser.normalize(item.text)
@@ -132,8 +118,6 @@ new_helper=r'''    private fun isAdminLockedGroup(items: List<NodeItem>): Boolea
 '''
 s=s[:start]+new_helper+s[end:]
 
-# When the editor exists v29 intentionally skips the expensive detector. Mark that
-# state explicitly; open-group hot-path behavior and timing remain unchanged.
 admin_old='''        val adminLockedGroupNow = if(messageEditorAvailable){
             rmV29AdminSkipped=true
             false
@@ -155,7 +139,6 @@ if admin_old not in s:
     raise SystemExit('v37 lazy admin block not found')
 s=s.replace(admin_old,admin_new,1)
 
-# Snapshot the detection source together with the existing v29 timing snapshot.
 copy_anchor='tdV29TailLoopMs=rmV29TailLoopMs'
 if copy_anchor not in s:
     raise SystemExit('v37 v29 snapshot anchor not found')
@@ -174,7 +157,7 @@ s=s.replace(old_header,new_header,1)
 for m in [
     new_header,
     'rmV37AdminLockSource="DIRECT_BANNER"',
-    'rmV37AdminLockSource="CONFIG_LOCKED"',
+    '"CONFIG_LOCKED"',
     'rmV37AdminLockSource="EDITOR"',
     'adminLockV37=source=$tdV37AdminLockSource',
     'pendingWatch=10ms',

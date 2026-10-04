@@ -22,12 +22,13 @@ for m in required:
     if m not in (p+s):
         raise SystemExit('PRECOMPILED NORMALIZE REGEX v35 wrong base: '+m)
 
-# Precompile the exact same three regex patterns once. Semantics/order remain identical.
-anchor='''    private val cageRegex =\n        Regex("""(?<![A-Z0-9])([A-Z1])[-.\\s]?(\\d{2})(?!\\d)""")\n\n'''
-insert=anchor+'''    private val normalizeMarksRegex = Regex("""\\p{Mn}+""")\n    private val normalizeNonAlnumRegex = Regex("""[^a-z0-9\\s]""")\n    private val normalizeWhitespaceRegex = Regex("""\\s+""")\n\n'''
-if anchor not in p:
-    raise SystemExit('v35 cage regex anchor not found')
-p=p.replace(anchor,insert,1)
+# Precompile the exact same three patterns once. Put them immediately before
+# normalize() so this patch is independent of formatting around cageRegex.
+normalize_anchor='    fun normalize(value: String): String {\n'
+normalize_insert='''    private val normalizeMarksRegex = Regex("""\\p{Mn}+""")\n    private val normalizeNonAlnumRegex = Regex("""[^a-z0-9\\s]""")\n    private val normalizeWhitespaceRegex = Regex("""\\s+""")\n\n    fun normalize(value: String): String {\n'''
+if normalize_anchor not in p:
+    raise SystemExit('v35 normalize anchor not found')
+p=p.replace(normalize_anchor,normalize_insert,1)
 
 p=p.replace('.replace(Regex("""\\p{Mn}+"""), "")','.replace(normalizeMarksRegex, "")',1)
 p=p.replace('.replace(Regex("""[^a-z0-9\\s]"""), " ")','.replace(normalizeNonAlnumRegex, " ")',1)
@@ -57,7 +58,6 @@ for m in [
     if m not in (p+s):
         raise SystemExit('PRECOMPILED NORMALIZE REGEX v35 verify failed: '+m)
 
-# Strong check: the old hot-path Regex constructions must be gone from normalize.
 normalize_start=p.find('    fun normalize(value: String): String {')
 normalize_end=p.find('\n    fun extractCage', normalize_start)
 segment=p[normalize_start:normalize_end]

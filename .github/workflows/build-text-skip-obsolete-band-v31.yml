@@ -3,7 +3,7 @@ name: Gerar APK TEXT v31 SKIP OBSOLETE BAND
 on:
   push:
     branches:
-      - test-v30-trunc-before-root
+      - test-v31-skip-obsolete-band
   workflow_dispatch:
 
 jobs:

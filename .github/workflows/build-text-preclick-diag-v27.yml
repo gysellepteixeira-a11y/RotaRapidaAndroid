@@ -53,7 +53,7 @@ jobs:
         run: python3 scripts/patch_v19_text_proof_direct_parse_v26.py
 
       - name: Medir trecho pre-clique do Ler mais v27
-        run: python3 scripts/patch_v19_text_preclick_diag_v27.py
+        run: python3 scripts/run_patch_v19_text_preclick_diag_v27_fixed.py
 
       - name: Configurar Java 17
         uses: actions/setup-java@v4

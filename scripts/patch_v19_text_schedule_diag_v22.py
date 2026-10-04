@@ -36,18 +36,11 @@ if state_old not in s:
     raise SystemExit('v22 state anchor not found')
 s=s.replace(state_old,state_new,1)
 
-# Keep the exact v21 event semantics, including rmPending/rmCarry handling. We only
-# timestamp the batch and count events that arrive while an analyze callback is queued.
-event_old='''        if (processing) return
-        if (rmPending) return
-        if (!analyzeScheduled) {
-            tdCandidate = SystemClock.elapsedRealtime()
-            if (!rmCarry) {
-                rmUsed=false; rmStarted=0L; rmClicked=0L; rmExpanded=0L; rmClickMs=0L; rmPolls=0
-'''
-event_new='''        if (processing) return
-        if (rmPending) return
-        val tdV22Now=SystemClock.elapsedRealtime()
+# Instrument the exact point that already calls scheduleAnalyze(12L). This is more
+# robust than matching the surrounding v21 Read-more guards and does not change
+# their behavior. Events that reach this call while analyzeScheduled=true are counted.
+event_call='        scheduleAnalyze(12L)\n'
+event_instrument='''        val tdV22Now=SystemClock.elapsedRealtime()
         if(!tdV22BatchActive || tdV22BatchEvent<=0L || tdV22Now-tdV22BatchEvent>1500L){
             tdV22BatchActive=true
             tdV22BatchEvent=tdV22Now
@@ -63,14 +56,11 @@ event_new='''        if (processing) return
         }else if(analyzeScheduled){
             tdV22EventsWhilePending++
         }
-        if (!analyzeScheduled) {
-            tdCandidate = SystemClock.elapsedRealtime()
-            if (!rmCarry) {
-                rmUsed=false; rmStarted=0L; rmClicked=0L; rmExpanded=0L; rmClickMs=0L; rmPolls=0
+        scheduleAnalyze(12L)
 '''
-if event_old not in s:
-    raise SystemExit('v22 event anchor not found')
-s=s.replace(event_old,event_new,1)
+if event_call not in s:
+    raise SystemExit('v22 schedule call anchor not found')
+s=s.replace(event_call,event_instrument,1)
 
 # Instrument the same Handler.postDelayed call. The callback timing is measured at
 # the first instruction inside the existing Runnable, before analyzeCurrentWindow().

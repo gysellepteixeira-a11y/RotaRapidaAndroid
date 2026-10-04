@@ -39,10 +39,9 @@ if state_anchor not in s:
     raise SystemExit('v32 state anchor not found')
 s=s.replace(state_anchor,state_insert,1)
 
-# Insert a native findAccessibilityNodeInfosByText(prefix) fast path immediately after
-# the same anchor/prefix validation used by v18. It may ONLY return early if it proves
-# the exact same conditions: same-message anchor match, >=12 char growth, and no
-# Read-more/ellipsis truncation. Otherwise the untouched v18 BFS executes below.
+# Native prefix search may return early only when it proves the exact same v18
+# conditions: same message, >=12 char growth and no Read-more/ellipsis truncation.
+# Otherwise the untouched strict BFS below remains the authoritative fallback.
 anchor='''        if(prefix.length<12 || rmBeforeAnchorLenV18<12)
             return ReadMoreProofV18(false,false,0,true,"NO_ANCHOR","")
 
@@ -93,17 +92,19 @@ if anchor not in s:
     raise SystemExit('v32 proof insertion anchor not found')
 s=s.replace(anchor,insert,1)
 
-# Snapshot native proof metrics with the v27/v23 proof snapshot before temporary state reset.
+# Snapshot native proof metrics with the existing v27/v23 proof snapshot.
 copy_anchor='tdV27RetryBandMs=rmV27RetryBandMs'
 copy_insert=copy_anchor+'''; tdV32NativeCalls=rmV32NativeCalls; tdV32NativeTotalMs=rmV32NativeTotalMs; tdV32NativeMaxMs=rmV32NativeMaxMs; tdV32NativeCandidates=rmV32NativeCandidates; tdV32NativeWins=rmV32NativeWins; tdV32BfsFallbacks=rmV32BfsFallbacks'''
 if copy_anchor not in s:
     raise SystemExit('v32 snapshot anchor not found')
 s=s.replace(copy_anchor,copy_insert,1)
 
-reset_anchor='rmV27RetryBandMs=0L'
+# Reset only in the existing per-attempt v27 reset chain. Do not match the class
+# field declaration with the same rmV27RetryBandMs text.
+reset_anchor='rmV27RetrySearchTotalMs=0L; rmV27RetrySearchMaxMs=0L; rmV27RetryBandMs=0L'
 reset_insert=reset_anchor+'''; rmV32NativeCalls=0; rmV32NativeTotalMs=0L; rmV32NativeMaxMs=0L; rmV32NativeCandidates=0; rmV32NativeWins=0; rmV32BfsFallbacks=0'''
 if reset_anchor not in s:
-    raise SystemExit('v32 reset anchor not found')
+    raise SystemExit('v32 contextual reset anchor not found')
 s=s.replace(reset_anchor,reset_insert,1)
 
 report_anchor='''                    appendLine("obsoleteBandV31=skipped=true | immediateBand=${tdV27BandMs}ms | retryBand=${tdV27RetryBandMs}ms | strictSameMessageProof=preserved")

@@ -11,7 +11,6 @@ new_header='===== DIAGNOSTICO TEXTO v36 | TEXT v6 + ASCII NORMALIZE FAST + PARSE
 for m in [
     old_header,
     'data class PlainParseDiagV34(',
-    'private fun priorityFor(text: String): Pair<Int, String>? {',
     'fun parsePlainTexts(texts: List<String>): RouteResult? {',
     'parserV34=$tdV34ParserDiag',
     'localProofV33=calls=$tdV33LocalCalls',
@@ -19,15 +18,15 @@ for m in [
     if m not in (p+s):
         raise SystemExit('ASCII NORMALIZE FAST v36 wrong base: '+m)
 
-# Keep the original normalize() and priorityFor() untouched for every other parser path.
-# Only parsePlainTexts gets an ASCII-equivalent fast normalizer. Any non-ASCII input
-# falls back to the original normalize(), preserving semantics for accents/Unicode.
-priority_anchor='''    private fun priorityFor(text: String): Pair<Int, String>? {\n        val normalized = normalize(text)\n        if (normalized.isBlank()) return null\n\n        priorities.forEachIndexed { index, rule ->\n            if (rule.requiredTokens.all { normalized.contains(it) }) {\n                return index to rule.name\n            }\n        }\n\n        return null\n    }\n'''
-if priority_anchor not in p:
-    raise SystemExit('v36 priorityFor anchor not found')
-helper_insert=priority_anchor+r'''
+# Keep original normalize()/priorityFor() untouched for every other parser path.
+# Only parsePlainTexts gets an ASCII-equivalent fast normalizer. Any non-ASCII
+# input falls back to the original normalize(), preserving accents/Unicode.
+parse_start=p.find('    fun parsePlainTexts(texts: List<String>): RouteResult? {')
+parse_end=p.find('\n    /**\n     * Fallback visual:',parse_start)
+if parse_start<0 or parse_end<0:
+    raise SystemExit('v36 parsePlainTexts region not found')
 
-    private fun normalizePlainLineV36(value: String): Pair<String, Boolean> {
+helper=r'''    private fun normalizePlainLineV36(value: String): Pair<String, Boolean> {
         var ascii=true
         for(ch in value){
             if(ch.code>127){
@@ -47,8 +46,8 @@ helper_insert=priority_anchor+r'''
                 out.append(ch)
                 separatorPending=false
             }else if(out.isNotEmpty()){
-                // For ASCII input, both whitespace and punctuation become/collapse to
-                // one separator under the original regex pipeline.
+                // On ASCII input, whitespace and punctuation are both separators
+                // after the original regex pipeline and collapse to one space.
                 separatorPending=true
             }
         }
@@ -74,13 +73,11 @@ helper_insert=priority_anchor+r'''
 
     @Volatile var lastPlainParseDiagV36=PlainParseDiagV36()
         private set
-'''
-p=p.replace(priority_anchor,helper_insert,1)
 
+'''
+p=p[:parse_start]+helper+p[parse_start:]
 parse_start=p.find('    fun parsePlainTexts(texts: List<String>): RouteResult? {')
 parse_end=p.find('\n    /**\n     * Fallback visual:',parse_start)
-if parse_start<0 or parse_end<0:
-    raise SystemExit('v36 parsePlainTexts region not found')
 
 parse_new=r'''    fun parsePlainTexts(texts: List<String>): RouteResult? {
         val v34totalStart=System.nanoTime()
@@ -198,4 +195,4 @@ for m in [
 
 P.write_text(p,encoding='utf-8')
 S.write_text(s,encoding='utf-8')
-print('ASCII NORMALIZE FAST v36 applied: ASCII-equivalent one-pass normalize in parsePlainTexts; non-ASCII uses original normalize; priority rules/order unchanged; v34/v33 diagnostics preserved')
+print('ASCII NORMALIZE FAST v36 applied: ASCII one-pass normalize in parsePlainTexts; non-ASCII uses original normalize; priority rules/order unchanged; v34/v33 diagnostics preserved')

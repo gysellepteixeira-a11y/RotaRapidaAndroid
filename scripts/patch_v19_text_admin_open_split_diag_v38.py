@@ -89,24 +89,28 @@ new_pending='''        val root = rootInActiveWindow ?: return false
 if old_pending not in pb:
     raise SystemExit('v38 pending collect/editor anchor not found')
 pb=pb.replace(old_pending,new_pending,1)
-old_set='''        val setOk = editor.node.performAction(
+old_set='''        val tdAs = if(tdOn) SystemClock.elapsedRealtime() else 0L
+        val setOk = editor.node.performAction(
             AccessibilityNodeInfo.ACTION_SET_TEXT,
             args
         )
+        if(tdOn && tdAs>0L){ tdSet += SystemClock.elapsedRealtime()-tdAs; if(setOk) tdFilled=SystemClock.elapsedRealtime() }
 
         if (!setOk) {
 '''
-new_set='''        val v38SetStart = SystemClock.elapsedRealtime()
+new_set='''        val tdAs = if(tdOn) SystemClock.elapsedRealtime() else 0L
+        val v38SetStart = SystemClock.elapsedRealtime()
         val setOk = editor.node.performAction(
             AccessibilityNodeInfo.ACTION_SET_TEXT,
             args
         )
         tdV38SetTextMs = SystemClock.elapsedRealtime() - v38SetStart
+        if(tdOn && tdAs>0L){ tdSet += SystemClock.elapsedRealtime()-tdAs; if(setOk) tdFilled=SystemClock.elapsedRealtime() }
 
         if (!setOk) {
 '''
 if old_set not in pb:
-    raise SystemExit('v38 pending setText anchor not found')
+    raise SystemExit('v38 pending setText diagnostic anchor not found')
 pb=pb.replace(old_set,new_set,1)
 s=s[:ps]+pb+s[pe:]
 

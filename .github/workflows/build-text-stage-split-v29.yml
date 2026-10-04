@@ -1,4 +1,4 @@
-name: Gerar APK TEXT v29 STAGE SPLIT DIAG
+name: Gerar APK TEXT v29 LAZY ADMIN CHECK
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
       - name: Medir trecho pre-clique do Ler mais v27
         run: python3 scripts/run_patch_v19_text_preclick_diag_v27_fixed.py
 
-      - name: Separar collect group tail v29
+      - name: Lazy admin check + stage diag v29
         run: python3 scripts/patch_v19_text_stage_split_v29.py
 
       - name: Configurar Java 17
@@ -81,6 +81,6 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-TEXT-v29-STAGE-SPLIT-DIAG-v27-v26-v24-v21-IMAGE-v9
+          name: RotaRapida-APK-v0.19-TEXT-v29-LAZY-ADMIN-CHECK-v27-v26-v24-v21-IMAGE-v9
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

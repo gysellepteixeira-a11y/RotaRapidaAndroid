@@ -8,7 +8,6 @@ new_header='===== DIAGNOSTICO TEXTO v22 | TEXT v6 + SCHEDULE DIAG + READ MORE v2
 required=[
     old_header,
     'private var rmDescWaitGenerationV21=0L; private var rmDescWaitActiveGenerationV21=0L',
-    'if (!analyzeScheduled) tdCandidate = SystemClock.elapsedRealtime()',
     'scheduleAnalyze(12L)',
     'private fun scheduleAnalyze(delayMs: Long)',
     'readMoreProof=$tdReadMoreProofV18',
@@ -37,13 +36,17 @@ if state_old not in s:
     raise SystemExit('v22 state anchor not found')
 s=s.replace(state_old,state_new,1)
 
-# Keep the exact existing scheduling behavior. We only timestamp the first event of
-# a diagnostic batch and count events that arrive while an analyze callback is queued.
+# Keep the exact v21 event semantics, including rmPending/rmCarry handling. We only
+# timestamp the batch and count events that arrive while an analyze callback is queued.
 event_old='''        if (processing) return
-        if (!analyzeScheduled) tdCandidate = SystemClock.elapsedRealtime()
-        scheduleAnalyze(12L)
+        if (rmPending) return
+        if (!analyzeScheduled) {
+            tdCandidate = SystemClock.elapsedRealtime()
+            if (!rmCarry) {
+                rmUsed=false; rmStarted=0L; rmClicked=0L; rmExpanded=0L; rmClickMs=0L; rmPolls=0
 '''
 event_new='''        if (processing) return
+        if (rmPending) return
         val tdV22Now=SystemClock.elapsedRealtime()
         if(!tdV22BatchActive || tdV22BatchEvent<=0L || tdV22Now-tdV22BatchEvent>1500L){
             tdV22BatchActive=true
@@ -60,8 +63,10 @@ event_new='''        if (processing) return
         }else if(analyzeScheduled){
             tdV22EventsWhilePending++
         }
-        if (!analyzeScheduled) tdCandidate = SystemClock.elapsedRealtime()
-        scheduleAnalyze(12L)
+        if (!analyzeScheduled) {
+            tdCandidate = SystemClock.elapsedRealtime()
+            if (!rmCarry) {
+                rmUsed=false; rmStarted=0L; rmClicked=0L; rmExpanded=0L; rmClickMs=0L; rmPolls=0
 '''
 if event_old not in s:
     raise SystemExit('v22 event anchor not found')

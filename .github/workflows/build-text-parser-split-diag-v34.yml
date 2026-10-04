@@ -67,7 +67,7 @@ jobs:
         run: python3 scripts/patch_v19_text_local_anchor_proof_v33.py
 
       - name: Corrigir placement do reset v33
-        run: python3 scripts/patch_v19_text_local_anchor_proof_v33_reset_fix.py
+        run: python3 scripts/fix_v33_reset_anchor.py
 
       - name: Parser split diagnostic v34
         run: python3 scripts/patch_v19_text_parser_split_diag_v34.py

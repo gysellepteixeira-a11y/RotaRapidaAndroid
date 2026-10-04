@@ -66,6 +66,9 @@ jobs:
       - name: Local anchor strict proof v33
         run: python3 scripts/patch_v19_text_local_anchor_proof_v33.py
 
+      - name: Corrigir placement do reset v33
+        run: python3 scripts/fix_v33_reset_anchor.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:

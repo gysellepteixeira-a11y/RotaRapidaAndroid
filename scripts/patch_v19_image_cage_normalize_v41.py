@@ -56,7 +56,7 @@ new='''                    // v41: ML Kit may expose the same visual cell both a
                     if(uniqueTexts.isNotEmpty()){
                         fun normalizeCageV41(raw:String):String {
                             return raw.uppercase(java.util.Locale.ROOT)
-                                .replace(Regex("[\\s\\-‐‑‒–—−_]+"),"")
+                                .replace(Regex("""[\\s\\-‐‑‒–—−_]+"""),"")
                                 .replace(Regex("[^A-Z0-9]"),"")
                         }
 

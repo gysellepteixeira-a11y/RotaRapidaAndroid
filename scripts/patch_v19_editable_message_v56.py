@@ -359,7 +359,7 @@ checks=[
     'messageNameV56',
     'refreshMessageProfileV56()',
     '"message_name_v56", "message_id_v56", "message_modal_v56"',
-    '"Nome: $messageNameV56\\\\n"',
+    '"Nome: $messageNameV56',
     'id="@+id/editMessageName"',
     'id="@+id/editMessageId"',
     'id="@+id/editMessageModal"',

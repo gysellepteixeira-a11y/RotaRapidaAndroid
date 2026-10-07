@@ -128,3 +128,4 @@ jobs:
           name: RotaRapida-APK-v0.19-v55-V54-EDITABLE-NEIGHBORHOODS
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+

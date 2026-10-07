@@ -93,10 +93,8 @@ if 'switchFloatingOverlay' not in a:
             Prefs.setStatus(
                 this,
                 when {
-                    checked && Prefs.groupName(this).isBlank() ->
-                        "Automação ligada, mas falta configurar o nome do grupo."
                     checked ->
-                        "Automação ligada. Abra o grupo no WhatsApp."
+                        "Automação ligada. Abra qualquer grupo no WhatsApp."
                     else ->
                         "Automação desligada."
                 }

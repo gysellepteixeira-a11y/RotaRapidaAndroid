@@ -302,7 +302,7 @@ class_insert='''    private val handler = Handler(Looper.getMainLooper())
             }
 
             val number = TextView(this).apply {
-                text = "\${index + 1}."
+                text = "${index + 1}."
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(dp(30), dp(48))
             }
@@ -406,7 +406,7 @@ class_insert='''    private val handler = Handler(Looper.getMainLooper())
         renderNeighborhoodRows()
         Prefs.setStatus(
             this,
-            "Bairros salvos: \${unique.size}. A ordem atual define a prioridade."
+            "Bairros salvos: ${unique.size}. A ordem atual define a prioridade."
         )
     }
 '''
@@ -415,9 +415,11 @@ if class_anchor not in a:
 a=a.replace(class_anchor,class_insert,1)
 
 bind_anchor='''        val accessibility = findViewById<Button>(R.id.buttonAccessibility)
+        val searchAgain = findViewById<Button>(R.id.buttonSearchAgain)
         status = findViewById(R.id.textStatus)
 '''
 bind_new='''        val accessibility = findViewById<Button>(R.id.buttonAccessibility)
+        val searchAgain = findViewById<Button>(R.id.buttonSearchAgain)
         val addNeighborhood = findViewById<Button>(R.id.buttonAddNeighborhood)
         val saveNeighborhoods = findViewById<Button>(R.id.buttonSaveNeighborhoods)
         val restoreNeighborhoods = findViewById<Button>(R.id.buttonRestoreNeighborhoods)

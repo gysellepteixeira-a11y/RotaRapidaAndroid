@@ -20,7 +20,6 @@ old='''        if(next){
 new='''        if(next){
             // Mesmo efeito funcional de PROCURAR NOVAMENTE do app:
             // rearma a busca apos uma rota ter sido enviada.
-            Prefs.clearSpeedDiagnosticOnly(this)
             Prefs.setSearchArmed(this,true)
             Prefs.setNeedsPrime(this,false)
 
@@ -45,7 +44,6 @@ s=s.replace(old,new,1)
 for m in [
     'Prefs.setSearchArmed(this,true)',
     'Prefs.setNeedsPrime(this,false)',
-    'Prefs.clearSpeedDiagnosticOnly(this)',
     'Prefs.setSearchArmed(this,false)',
     'Prefs.isEnabled(this) && Prefs.searchArmed(this)',
 ]:

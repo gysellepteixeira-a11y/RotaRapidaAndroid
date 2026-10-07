@@ -211,7 +211,7 @@ old_priority='''        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="1. Valparaiso&#10;2. Colina de Laranjeiras&#10;3. Praia da Baleia&#10;4. Morada de Laranjeiras&#10;5. Eurico&#10;6. Manoel Plaza&#10;7. Rosario&#10;8. Helio Ferraz&#10;9. Parque Residencial Laranjeiras&#10;10. Barcelona&#10;11. Maringa"
+            android:text="1. Valparaiso&#10;2. Colina de Laranjeiras&#10;3. Praia da Baleia&#10;4. Morada de Laranjeiras&#10;5. Eurico&#10;6. Manoel Plaza&#10;7. Rosario"
             android:textSize="14sp" />
 '''
 new_priority='''        <TextView

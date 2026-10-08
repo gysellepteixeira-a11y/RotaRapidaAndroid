@@ -1,0 +1,144 @@
+name: Gerar APK v59 ULTRATHIN IMAGE
+
+on:
+  push:
+    branches:
+      - test-v59-ultrathin-image-v58
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Reproduzir base TEXT v18 + IMAGE v9
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          p=Path('.github/workflows/build-text-read-more-expanded-v16.yml')
+          text=p.read_text(encoding='utf-8')
+          scripts=re.findall(r'run:\s+python3\s+(scripts/[^\s]+\.py)', text)
+          if not scripts:
+              raise SystemExit('Nenhum patch da base v18 encontrado')
+          if scripts[-1] != 'scripts/patch_v19_text_read_more_strict_v18.py':
+              raise SystemExit('Base v18 inesperada: ultimo patch='+scripts[-1])
+          for script in scripts:
+              print('>>>', script, flush=True)
+              subprocess.run(['python3', script], check=True)
+          PY
+
+      - name: Esperar no real Ler mais sem gestos v20
+        run: python3 scripts/patch_v19_text_read_more_desc_wait_v20.py
+
+      - name: Invalidar callbacks antigos do DESC WAIT v21
+        run: python3 scripts/patch_v19_text_read_more_desc_wait_token_v21.py
+
+      - name: Medir atraso do Handler v22
+        run: python3 scripts/patch_v19_text_schedule_diag_v22.py
+
+      - name: Medir custo da prova do Ler mais v23
+        run: python3 scripts/patch_v19_text_read_more_proof_diag_v23.py
+
+      - name: Pular prova imediata e usar primeira prova apos 6ms v24
+        run: python3 scripts/patch_v19_text_read_more_skip_immediate_proof_v24.py
+
+      - name: Medir trecho pos-proof ate rota v25
+        run: python3 scripts/patch_v19_text_post_proof_diag_v25.py
+
+      - name: Parse direto do texto ja validado pelo strict proof v26
+        run: python3 scripts/patch_v19_text_proof_direct_parse_v26.py
+
+      - name: Medir trecho pre-clique do Ler mais v27
+        run: python3 scripts/run_patch_v19_text_preclick_diag_v27_fixed.py
+
+      - name: Lazy admin check v29
+        run: python3 scripts/patch_v19_text_stage_split_v29.py
+
+      - name: Truncation before root scan v30
+        run: python3 scripts/patch_v19_text_trunc_before_root_v30.py
+
+      - name: Skip obsolete band v31
+        run: python3 scripts/patch_v19_text_skip_obsolete_band_v31.py
+
+      - name: Local anchor strict proof v33
+        run: python3 scripts/patch_v19_text_local_anchor_proof_v33.py
+
+      - name: Corrigir placement do reset v33
+        run: python3 scripts/fix_v33_reset_anchor.py
+
+      - name: Parser split diagnostic v34
+        run: python3 scripts/patch_v19_text_parser_split_diag_v34.py
+
+      - name: ASCII normalize fast v36
+        run: python3 scripts/patch_v19_text_ascii_normalize_fast_v36.py
+
+      - name: Admin closed read fix v37
+        run: python3 scripts/patch_v19_text_admin_closed_read_fix_v37.py
+
+      - name: Adicionar Mata da Praia e Republica v46
+        run: python3 scripts/patch_v19_add_mata_republica_v46.py
+
+      - name: Limpar caminho critico v47
+        run: python3 scripts/patch_v19_clean_fast_v47.py
+
+      - name: Editor fast path v48
+        run: python3 scripts/patch_v19_editor_fastpath_v48.py
+
+      - name: Diagnostico completo v51
+        run: python3 scripts/patch_v19_v48_full_diag_v51.py
+
+      - name: Botao flutuante ON OFF v52
+        run: python3 scripts/patch_v19_floating_toggle_v52.py
+
+      - name: Rearmar busca pelo botao flutuante v53
+        run: python3 scripts/patch_v19_floating_rearm_v53.py
+
+      - name: Estado/cor e controle do overlay v54
+        run: python3 scripts/patch_v19_floating_state_toggle_v54.py
+
+      - name: Bairros editaveis v55
+        run: python3 scripts/patch_v19_editable_neighborhoods_v55.py
+
+      - name: Mensagem editavel v56
+        run: python3 scripts/patch_v19_editable_message_v56.py
+
+      - name: Corrigir colisao de bairros v57
+        run: python3 scripts/patch_v19_neighborhood_collision_fix_v57.py
+
+      - name: Aceitar letras de gaiola A-Z v58
+        run: python3 scripts/patch_v19_cage_letters_v58.py
+
+      - name: OCR especial para imagem ultrafina v59
+        run: python3 scripts/patch_v19_ultrathin_image_v59.py
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Instalar Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Configurar Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Compilar APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RotaRapida-APK-v0.19-v59-V58-ULTRATHIN-IMAGE
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+

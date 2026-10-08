@@ -32,6 +32,16 @@ if waiter_anchor not in s:
     raise SystemExit("v57 waiter anchor missing")
 s=s.replace(waiter_anchor,helper+waiter_anchor,1)
 
+wait_guard='''    private fun waitForReadMoreDescV20(startedAt:Long,poll:Int,generation:Long){
+        if(generation!=rmDescWaitActiveGenerationV21 || !rmPending)return
+'''
+wait_guard_new='''    private fun waitForReadMoreDescV20(startedAt:Long,poll:Int,generation:Long){
+        if(generation!=rmDescWaitActiveGenerationV21 || !rmPending || processing)return
+'''
+if wait_guard not in s:
+    raise SystemExit("v57 waiter guard anchor missing")
+s=s.replace(wait_guard,wait_guard_new,1)
+
 media_anchor='''        val media = findNewestWhatsAppImage() ?: return
 
         // Reserva o arquivo antes de iniciar OCR para nenhum outro evento pegar o
@@ -71,7 +81,7 @@ new_diag='''        val timeoutGenerationV57=generation
                 this,
                 "TEXT v21: rota truncada detectada, mas o botao Ler mais real nao apareceu em ${timeoutMsV57}ms (${timeoutPollsV57} polls). Diagnostico v51 salvo abaixo. Nenhuma rota parcial foi enviada."
             )
-        },250L)
+        },1200L)
 '''
 if old_diag not in s:
     raise SystemExit("v57 v51 timeout diagnostic block missing")
@@ -82,7 +92,8 @@ checks=[
     'cancelReadMoreForImageV57()',
     'val timeoutGenerationV57=generation',
     'timeoutGenerationV57!=rmDescWaitGenerationV21 || processing',
-    '},250L)',
+    '|| !rmPending || processing',
+    '},1200L)',
     'readMediaOriginal(media)',
     'Prefs.setSpeedDiagnosticReport(this,readMoreDumpV51)',
 ]

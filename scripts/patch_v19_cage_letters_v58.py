@@ -58,7 +58,7 @@ if old_right not in s:
 s=s.replace(old_right,new_right,1)
 
 checks_r=[
-    '([A-Z])[-.\\\\s]?(\\\\d{2})',
+    '([A-Z])',
     'private val cageIFallbackRegex',
     'fun extractCage(value: String): String?',
 ]

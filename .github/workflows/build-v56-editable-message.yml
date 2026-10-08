@@ -1,9 +1,9 @@
-name: Gerar APK v56 EDITABLE MESSAGE
+name: Gerar APK v57 IMAGE PRIORITY
 
 on:
   push:
     branches:
-      - test-v56-editable-message-v55
+      - test-v57-image-priority-readmore-cancel-v56
   workflow_dispatch:
 
 jobs:
@@ -105,6 +105,9 @@ jobs:
       - name: Mensagem editavel v56
         run: python3 scripts/patch_v19_editable_message_v56.py
 
+      - name: Prioridade imagem sobre Ler mais v57
+        run: python3 scripts/patch_v19_image_priority_readmore_cancel_v57.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
@@ -128,7 +131,7 @@ jobs:
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
-          name: RotaRapida-APK-v0.19-v56-V55-EDITABLE-MESSAGE
+          name: RotaRapida-APK-v0.19-v57-V56-IMAGE-PRIORITY
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 

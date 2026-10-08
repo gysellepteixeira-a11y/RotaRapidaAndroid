@@ -92,3 +92,4 @@ for m in checks:
 
 S.write_text(s,encoding="utf-8")
 print("v57 IMAGE PRIORITY aplicado: MediaStore cancela DESC_WAIT; dump v51 recebe grace 250ms e nao sobrescreve OCR")
+

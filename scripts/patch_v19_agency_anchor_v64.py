@@ -67,8 +67,8 @@ block=block.replace(sig_old,sig_new,1)
 
 legacy='''        val safeWidthRatio = widthRatio.coerceIn(0.42f, 0.90f)
         val leftRatio = (0.270f / safeWidthRatio).coerceIn(0.45f, 0.72f)
-        val rightRatio = (0.505f / safeWidthRatio)
-            .coerceIn(leftRatio + 0.16f, 0.985f)
+        val rightRatio = 0.975f
+            .coerceAtLeast(leftRatio + 0.16f)
 
         val x1 = (denseBitmap.width * leftRatio).toInt()
             .coerceIn(0, denseBitmap.width - 2)
@@ -97,8 +97,8 @@ anchored='''        val safeWidthRatio = widthRatio.coerceIn(0.42f, 0.90f)
         } else {
             // Fallback byte-for-byte equivalente ao criterio v61.
             leftRatio = (0.270f / safeWidthRatio).coerceIn(0.45f, 0.72f)
-            rightRatio = (0.505f / safeWidthRatio)
-                .coerceIn(leftRatio + 0.16f, 0.985f)
+            rightRatio = 0.975f
+                .coerceAtLeast(leftRatio + 0.16f)
         }
 
         val x1 = (denseBitmap.width * leftRatio).toInt()

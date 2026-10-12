@@ -197,17 +197,15 @@ s=s.replace(warm_func_anchor,warm_func+warm_func_anchor,1)
 
 # Agenda o aquecimento periodico junto da conexao do servico; mantem o warmUp
 # original da base, que continua sendo o primeiro warm ao conectar.
-connect_old='''        warmUpRecognizer()
-        handler.postDelayed({ primeCurrentScreen() }, 350)
+connect_anchor='''        warmUpRecognizer()
 '''
 connect_new='''        warmUpRecognizer()
         handler.removeCallbacks(ocrWarmRunnableV66)
         handler.postDelayed(ocrWarmRunnableV66, OCR_WARM_INTERVAL_V66_MS)
-        handler.postDelayed({ primeCurrentScreen() }, 350)
 '''
-if connect_old not in s:
-    raise SystemExit("v66 service connect anchor missing")
-s=s.replace(connect_old,connect_new,1)
+if connect_anchor not in s:
+    raise SystemExit("v66 service connect warm anchor missing")
+s=s.replace(connect_anchor,connect_new,1)
 
 # Ao armar por QUALQUER caminho que altere search_armed/enabled, faz warm imediato.
 listener_old='''                "enabled", "search_armed" ->

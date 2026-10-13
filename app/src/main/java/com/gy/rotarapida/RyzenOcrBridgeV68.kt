@@ -1,6 +1,7 @@
 package com.gy.rotarapida
 
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -20,15 +21,30 @@ internal object RyzenOcrBridgeV68 {
     )
     private val codigo = Regex("^[A-Z]-[0-9]{2}$")
 
-    fun reconhecer(jpg: ByteArray): Result? {
-        if (jpg.isEmpty() || jpg.size > 4_000_000) return null
+    private fun canon(s: String): String = when (RouteParser.normalize(s)) {
+        "rosario de fatima" -> "rosario"
+        else -> RouteParser.normalize(s)
+    }
+
+    fun reconhecer(jpg: ByteArray, ordemBairros: List<String>): Result? {
+        if (jpg.isEmpty() || jpg.size > 4_000_000 || ordemBairros.isEmpty() || ordemBairros.size > 32) return null
         return try {
             Socket().use { socket ->
                 socket.tcpNoDelay = true
                 socket.connect(InetSocketAddress("127.0.0.1", 8765), 250)
-                socket.soTimeout = 2500
+                socket.soTimeout = 4500
                 val output = DataOutputStream(socket.getOutputStream())
                 val input = DataInputStream(socket.getInputStream())
+                // v69: protocolo versionado com lista de prioridades do aplicativo.
+                // Servidores antigos (v68) recusam este pacote e o OCR local assume.
+                val metadata = JSONObject()
+                    .put("versao", 69)
+                    .put("prioridades", JSONArray(ordemBairros))
+                    .toString().toByteArray(Charsets.UTF_8)
+                if (metadata.size > 16_384) return null
+                output.writeInt(0)
+                output.writeInt(metadata.size)
+                output.write(metadata)
                 output.writeInt(jpg.size)
                 output.write(jpg)
                 output.flush()
@@ -40,8 +56,9 @@ internal object RyzenOcrBridgeV68 {
                 if (root.optString("estado") != "OK") return null
                 val result = root.optJSONObject("resultado") ?: return null
                 if (result.optString("estado") != "OK") return null
-                val bairro = RouteParser.normalize(result.optString("bairro"))
-                val index = nomes.indexOfFirst { RouteParser.normalize(it) == bairro }
+                val bairro = canon(result.optString("bairro"))
+                val index = ordemBairros.indexOfFirst { canon(it) == bairro }
+                val conhecido = nomes.firstOrNull { canon(it) == bairro } ?: return null
                 if (index < 0) return null
                 val arr = result.optJSONArray("gaiolas") ?: return null
                 val gaiolas = ArrayList<String>()
@@ -50,7 +67,7 @@ internal object RyzenOcrBridgeV68 {
                     if (codigo.matches(c) && c !in gaiolas) gaiolas.add(c)
                 }
                 if (gaiolas.isEmpty()) return null
-                Result(nomes[index], index, gaiolas, root.optDouble("tempo_pc_ms", -1.0))
+                Result(conhecido, index, gaiolas, root.optDouble("tempo_pc_ms", -1.0))
             }
         } catch (_: Exception) {
             null // OCR do telefone faz reserva; NUNCA envie resultado parcial

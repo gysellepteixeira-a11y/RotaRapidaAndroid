@@ -17,7 +17,7 @@ internal object RyzenOcrBridgeV68 {
     internal data class Result(val bairro: String, val priority: Int, val gaiolas: List<String>, val pcMs: Double)
     private val nomes = listOf(
         "Valparaíso", "Colina de Laranjeiras", "Praia da Baleia",
-        "Mata da Praia", "Morada de Laranjeiras", "Eurico", "Rosário", "Manoel Plaza"
+        "Mata da Praia", "Morada de Laranjeiras", "Eurico", "Rosário", "Manoel Plaza", "República"
     )
     private val codigo = Regex("^[A-Z]-[0-9]{2}$")
 

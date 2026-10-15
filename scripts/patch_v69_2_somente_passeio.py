@@ -64,15 +64,18 @@ s=once(s,'''    private fun sendRouteInCurrentChat(route: RouteResult) {''',''' 
             finishFileOnlyFailure("Somente PASSEIO: modalidade nao confirmada; nao enviei.")
             return
         }''','global gate')
-# O caminho TEXT DIRECT ignora sendRouteInCurrentChat. Bloqueie-o no
-# evento, preservando o MediaStore watcher independente que le imagens.
-s=once(s,'        if (!Prefs.needsPrime(this) && tryTextDirectFast(event)) return',
-       '        if (!Prefs.onlyPasseioV692(this) && !Prefs.needsPrime(this) && tryTextDirectFast(event)) return',
-       'block text fast')
-s=once(s,'''        inspectImageHint(event)
-        scheduleAnalyze(12L)''','''        inspectImageHint(event)
-        if (Prefs.onlyPasseioV692(this)) return
-        scheduleAnalyze(12L)''','block text fallback')
+# Bloqueio do TEXT DIRECT e do analisador de texto: o MediaStore Watcher
+# e independente, e segue capturando novas imagens no modo seguro.
+s=once(s,'''    override fun onAccessibilityEvent(event: AccessibilityEvent?) {''','''    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (Prefs.onlyPasseioV692(this)) {
+            if (event != null && Prefs.isEnabled(this)) {
+                val pkgModal = event.packageName?.toString().orEmpty()
+                if (pkgModal == WHATSAPP || pkgModal == WHATSAPP_BUSINESS) {
+                    inspectImageHint(event)
+                }
+            }
+            return
+        }''','block unverified text events')
 s=once(s,'''    private fun markSent(route: RouteResult) {''','''    private fun markSent(route: RouteResult) {
         authorizedPasseioKeyV692 = null''','reset')
 S.write_text(s,encoding='utf-8')

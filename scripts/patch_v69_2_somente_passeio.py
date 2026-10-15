@@ -64,6 +64,15 @@ s=once(s,'''    private fun sendRouteInCurrentChat(route: RouteResult) {''',''' 
             finishFileOnlyFailure("Somente PASSEIO: modalidade nao confirmada; nao enviei.")
             return
         }''','global gate')
+# O caminho TEXT DIRECT ignora sendRouteInCurrentChat. Bloqueie-o no
+# evento, preservando o MediaStore watcher independente que le imagens.
+s=once(s,'        if (!Prefs.needsPrime(this) && tryTextDirectFast(event)) return',
+       '        if (!Prefs.onlyPasseioV692(this) && !Prefs.needsPrime(this) && tryTextDirectFast(event)) return',
+       'block text fast')
+s=once(s,'''        inspectImageHint(event)
+        scheduleAnalyze(12L)''','''        inspectImageHint(event)
+        if (Prefs.onlyPasseioV692(this)) return
+        scheduleAnalyze(12L)''','block text fallback')
 s=once(s,'''    private fun markSent(route: RouteResult) {''','''    private fun markSent(route: RouteResult) {
         authorizedPasseioKeyV692 = null''','reset')
 S.write_text(s,encoding='utf-8')

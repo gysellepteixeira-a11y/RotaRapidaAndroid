@@ -81,7 +81,7 @@ anchored='''        val safeWidthRatio = widthRatio.coerceIn(0.42f, 0.90f)
         // v64: nas imagens reais a coluna Agency colorida e um anchor muito mais
         // estavel que uma coordenada fixa. O detector acima ja encontrou agencyRatio.
         // Testes geometricos nas rotas reais mostraram:
-        // 15% pode cortar nomes longos; 16% fica no limite; 18% preserva todos.
+        // 18% ainda cortou Rosário de Fátima no teste real; ampliar para 28% sem adicionar uma segunda leitura.
         val anchorValid = agencyRatio in 0.42f..0.95f
         val leftRatio: Float
         val rightRatio: Float
@@ -89,7 +89,7 @@ anchored='''        val safeWidthRatio = widthRatio.coerceIn(0.42f, 0.90f)
         if (anchorValid) {
             val agencyInDense = (agencyRatio / safeWidthRatio)
                 .coerceIn(0.20f, 0.995f)
-            val bandInDense = (0.18f / safeWidthRatio)
+            val bandInDense = (0.28f / safeWidthRatio)
             leftRatio = (agencyInDense - bandInDense)
                 .coerceIn(0.02f, 0.94f)
             rightRatio = agencyInDense
@@ -170,7 +170,7 @@ report_old='''            if(idBairro>0L) appendLine("[${idA(idBairro)}] Bairro:
             if(idCage>0L) appendLine("[${idA(idCage)}] Gaiola: $idCageText | OCR=${idCageOcr}ms")
 '''
 report_new='''            if(idBairro>0L) appendLine("[${idA(idBairro)}] Bairro: $idNeighborhood | OCR=${idBairroOcr}ms | decode=${idDecode}ms | scan=${idScan}ms")
-            if(idAgencyAnchorV64) appendLine("agencyAnchorV64=true | agency=${String.format(java.util.Locale.US, "%.1f", idAgencyRatioV64*100f)}% | bairroBand=${idBairroBandPxV64}px | sourceBand=18%")
+            if(idAgencyAnchorV64) appendLine("agencyAnchorV64=true | agency=${String.format(java.util.Locale.US, "%.1f", idAgencyRatioV64*100f)}% | bairroBand=${idBairroBandPxV64}px | sourceBand=28%")
             if(idCage>0L) appendLine("[${idA(idCage)}] Gaiola: $idCageText | OCR=${idCageOcr}ms")
 '''
 if report_old not in s:
@@ -195,4 +195,4 @@ for m in [
         raise SystemExit("v64 verify failed: "+m)
 
 S.write_text(s,encoding="utf-8")
-print("v64 aplicado: crop Bairro ancorado na Agency ja detectada; 18% da largura original; fallback v61 preservado")
+print("v64 aplicado: crop Bairro ancorado na Agency ja detectada; 28% da largura original; fallback v61 preservado")

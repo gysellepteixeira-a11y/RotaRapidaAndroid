@@ -144,6 +144,9 @@ jobs:
       - name: Rosário com nome completo e proteção Feu Rosa v66.5
         run: python3 scripts/patch_v19_rosario_strict_v66_5.py
 
+      - name: Exigir acento literal em Rosário (teste isolado)
+        run: python3 scripts/patch_v19_rosario_accent_only_v66_6.py
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:

@@ -71,10 +71,19 @@ object RouteParser {
     }
 
     private fun priorityFor(text: String): Pair<Int, String>? {
+        // Rosario so entra quando o OCR le o acento agudo em "Rosário".
+        // "Rosario", "Rosar", "de Fatima" e aproximacoes nao sao aceitos.
+        val hasAccentedRosario = Regex(
+            """(?i)(?<![\\p{L}])rosário(?![\\p{L}])"""
+        ).containsMatchIn(text)
+
         val normalized = normalize(text)
         if (normalized.isBlank()) return null
 
         priorities.forEachIndexed { index, rule ->
+            if (rule.name == "Rosario" && !hasAccentedRosario) {
+                return@forEachIndexed
+            }
             if (rule.requiredTokens.all { normalized.contains(it) }) {
                 return index to rule.name
             }

@@ -3,7 +3,7 @@ name: Gerar APK v66.5 ROSARIO STRICT
 on:
   push:
     branches:
-      - test-v66-5-rosario-strict
+      - test-v66-5-rosario-accent-only
   workflow_dispatch:
 
 jobs:

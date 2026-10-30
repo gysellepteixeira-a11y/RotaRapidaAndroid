@@ -144,6 +144,23 @@ jobs:
       - name: Rosário com nome completo e proteção Feu Rosa v66.5
         run: python3 scripts/patch_v19_rosario_strict_v66_5.py
 
+      - name: Exigir acento literal em Rosário no OCR (teste)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/gy/rotarapida/RouteParser.kt')
+          s=p.read_text(encoding='utf-8')
+          needle='''        priorities.forEachIndexed { index, rule ->'''
+          if needle not in s:
+              raise SystemExit('Loop de prioridades nao encontrado')
+          guard='''        val hasAccentedRosario = Regex("""(?i)(?<![\\\\p{L}])rosário(?![\\\\p{L}])""").containsMatchIn(text)
+        priorities.forEachIndexed { index, rule ->
+            if (rule.name == "Rosario" && !hasAccentedRosario) return@forEachIndexed'''
+          s=s.replace(needle,guard,1)
+          p.write_text(s,encoding='utf-8')
+          print('Rosario agora exige acento agudo literal')
+          PY
+
       - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:

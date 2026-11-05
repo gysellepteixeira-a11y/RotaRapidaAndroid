@@ -8,14 +8,14 @@ import kotlin.math.abs
 
 /**
  * Filtra modalidades SEM OCR adicional. Amostra a cor da coluna Modal (direita).
- * FAKE VOLUMOSO (rosa) e bloqueado no modo padrao; MOTO (preto) sempre.
+ * FAKE VOLUMOSO (rosa) e VOLUMOSO (vermelho) bloqueados no modo padrao; MOTO (preto) sempre.
  * Azul e cores desconhecidas sao aceitos.
  *
  * Filtrar antes do OCR faz o parser ignorar bairro/gaiola de linhas bloqueadas.
  * Em imagens densas, topOffset e o deslocamento vertical do recorte.
  */
 internal object ModalFilter {
-    private enum class Mode { BLUE, PINK, BLACK, OTHER }
+    private enum class Mode { BLUE, VOLUMOSO, BLACK, OTHER }
     private data class Span(val start: Int, val end: Int)
 
     private fun classify(pixel: Int): Mode {
@@ -24,7 +24,7 @@ internal object ModalFilter {
         val b = Color.blue(pixel)
         return when {
             b >= 105 && b >= r + 25 && b >= g + 13 && r <= 125 && g in 28..170 -> Mode.BLUE
-            r >= 165 && r >= g + 19 && g in 90..235 && b >= 70 && b <= r + 20 -> Mode.PINK
+            r >= 130 && r >= g + 24 && r >= b + 17 && g <= 230 -> Mode.VOLUMOSO
             r <= 105 && g <= 105 && b <= 105 &&
                 abs(r - g) <= 38 && abs(g - b) <= 38 -> Mode.BLACK
             else -> Mode.OTHER
@@ -33,19 +33,19 @@ internal object ModalFilter {
 
     private fun excludedAtY(source: Bitmap, y: Int, includeFake: Boolean): Mode? {
         val fractions = floatArrayOf(.89f, .905f, .92f, .935f, .95f, .965f, .98f)
-        var pink = 0
+        var volumoso = 0
         var black = 0
         for (fraction in fractions) {
             val x = (source.width * fraction).toInt().coerceIn(0, source.width - 1)
             when (classify(source.getPixel(x, y))) {
-                Mode.PINK -> pink++
+                Mode.VOLUMOSO -> volumoso++
                 Mode.BLACK -> black++
                 else -> Unit
             }
         }
         return when {
             black >= 4 -> Mode.BLACK
-            !includeFake && pink >= 4 -> Mode.PINK
+            !includeFake && volumoso >= 4 -> Mode.VOLUMOSO
             else -> null
         }
     }

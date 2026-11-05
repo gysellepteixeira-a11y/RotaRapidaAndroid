@@ -219,7 +219,7 @@ gradle = replace_one(
     "    buildTypes {",
     '''    buildTypes {
         getByName("debug") {
-            applicationIdSuffix = ".modaltest"
+            applicationIdSuffix = ".modalredfix"
         }''',
     "test appId"
 )
@@ -230,7 +230,7 @@ strings = strings_file.read_text(encoding="utf-8")
 strings = replace_one(
     strings,
     '<string name="app_name">Rota Rápida</string>',
-    '<string name="app_name">Rota Rápida (TESTE MODAL)</string>',
+    '<string name="app_name">Rota Rápida (TESTE MODAL 2)</string>',
     "test app name"
 )
 strings = strings.replace(

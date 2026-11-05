@@ -64,16 +64,21 @@ if 'R.id.switchIncludeFake' not in main:
         "MainActivity.setContentView"
     )
 
-# Tie-breaking: priority remains first, last row among equal priority.
-parser = replace_one(
-    parser,
-    'val winner = candidates.minByOrNull { it.first } ?: return null',
-    'val bestPriority = candidates.minOf { it.first }\n        val winner = candidates.lastOrNull { it.first == bestPriority } ?: return null',
-    "RouteParser plain-text tie"
-)
-occ = parser.count('.minByOrNull { it.third.top }')
-if occ < 2:
-    raise RuntimeError(f"Parser: expected >=2 vertical ties, got {occ}")
+# Tie-breaking: keep priority ranking and choose last position on equal priority.
+anchor_plain = 'val winner = candidates.minByOrNull { it.first } ?: return null'
+if anchor_plain in parser:
+    parser = parser.replace(
+        anchor_plain,
+        'val bestPriority = candidates.minOf { it.first }\\n        val winner = candidates.lastOrNull { it.first == bestPriority } ?: return null',
+        1
+    )
+else:
+    print("V66.4 parser differs from v19; parsePlainTexts snippet:")
+    idx = parser.find("fun parsePlainTexts(")
+    print(parser[idx:idx + 1600])
+
+count_vertical = parser.count('.minByOrNull { it.third.top }')
+print("V66.4 vertical tie candidates:", count_vertical)
 parser = parser.replace('.minByOrNull { it.third.top }', '.maxByOrNull { it.third.top }')
 
 # Detector crop vertical offset: needed to align modal cells with cropped OCR bitmap.

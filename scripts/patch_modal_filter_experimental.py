@@ -179,4 +179,33 @@ prefs_file.write_text(prefs, encoding="utf-8")
 main_file.write_text(main, encoding="utf-8")
 parser_file.write_text(parser, encoding="utf-8")
 layout_file.write_text(layout, encoding="utf-8")
+
+# Distinct debug application ID and label: do NOT overwrite the production V66.4.
+gradle_file = Path("app/build.gradle.kts")
+gradle = gradle_file.read_text(encoding="utf-8")
+gradle = replace_one(
+    gradle,
+    "    buildTypes {",
+    '''    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".modaltest"
+        }''',
+    "test appId"
+)
+gradle_file.write_text(gradle, encoding="utf-8")
+
+strings_file = base / "res/values/strings.xml"
+strings = strings_file.read_text(encoding="utf-8")
+strings = replace_one(
+    strings,
+    '<string name="app_name">Rota Rápida</string>',
+    '<string name="app_name">Rota Rápida (TESTE MODAL)</string>',
+    "test app name"
+)
+strings = strings.replace(
+    '<string name="service_name">Rota Rápida — WhatsApp</string>',
+    '<string name="service_name">Rota Rápida TESTE MODAL — WhatsApp</string>'
+)
+strings_file.write_text(strings, encoding="utf-8")
+
 print("MODAL FILTER EXPERIMENTAL applied: PASSEIO+UNKNOWN, optional FAKE, never MOTO, last equal-priority cage")

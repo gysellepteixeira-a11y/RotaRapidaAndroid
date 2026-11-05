@@ -74,8 +74,19 @@ if anchor_plain in parser:
     )
 else:
     print("V66.4 parser differs from v19; parsePlainTexts snippet:")
-    idx = parser.find("fun parsePlainTexts(")
-    print(parser[idx:idx + 1600])
+    anchor_dynamic = 'val winner=candidates.minByOrNull { it.first }'
+    if anchor_dynamic in parser:
+        parser = parser.replace(
+            anchor_dynamic,
+            'val topPriority = candidates.minOf { it.first }\\n'
+            '            val winner=candidates.lastOrNull { it.first == topPriority }',
+            1
+        )
+        print("V66.4 plain parser last-equal-priority tie applied")
+    else:
+        idx = parser.find("fun parsePlainTexts(")
+        print(parser[idx:idx + 1600])
+        raise RuntimeError("V66.4 plain parser tie not recognized")
 
 count_vertical = parser.count('.minByOrNull { it.third.top }')
 print("V66.4 vertical tie candidates:", count_vertical)

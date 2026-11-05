@@ -78,8 +78,8 @@ else:
     if anchor_dynamic in parser:
         parser = parser.replace(
             anchor_dynamic,
-            'val topPriority = candidates.minOf { it.first }\\n'
-            '            val winner=candidates.lastOrNull { it.first == topPriority }',
+            '''val topPriority = candidates.minOf { it.first }
+            val winner=candidates.lastOrNull { it.first == topPriority }''',
             1
         )
         print("V66.4 plain parser last-equal-priority tie applied")

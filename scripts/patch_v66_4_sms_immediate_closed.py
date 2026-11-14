@@ -4,6 +4,7 @@ Roda APOS patch_v66_4_sms_only_switch.py.
 from pathlib import Path
 
 S = Path("app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt")
+G = Path("app/build.gradle.kts")
 s = S.read_text(encoding="utf-8")
 
 def exactly_once(old, new, desc):
@@ -80,6 +81,14 @@ for marker in [
 ]:
     if marker not in s:
         raise RuntimeError("SMS IMEDIATO: verificacao falhou: " + marker)
+
+# Debug APK de teste separado: evita conflito de assinatura com build anterior.
+g = G.read_text(encoding="utf-8")
+needle = 'applicationIdSuffix = ".modalredfix.smsonly"'
+if g.count(needle) != 1:
+    raise RuntimeError("SMS IMEDIATO: ID de teste inesperado")
+g = g.replace(needle, 'applicationIdSuffix = ".modalredfix.smsonly.immediate"')
+G.write_text(g, encoding="utf-8")
 
 S.write_text(s, encoding="utf-8")
 print("SMS imediato apos reconhecimento de rota, independente do estado do grupo")

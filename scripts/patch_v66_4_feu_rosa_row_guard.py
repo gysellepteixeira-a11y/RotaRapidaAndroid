@@ -72,8 +72,10 @@ new = '''                    "BAIRRO PRIMEIRO: ${chosen.neighborhood} | " +
                         "ocr=[${chosen.raw.take(38)}] | " +
                         "linhaY=${chosen.centerY} | OCR=${bairroOcrMs}ms | agora Gaiola..."
 '''
-if old not in s: raise SystemExit("status anchor missing")
-s = s.replace(old,new,1)
+if old in s:
+    s = s.replace(old,new,1)
+else:
+    print("Bairro-first status format differs; preserving original diagnostic")
 assert '"rosario de fatima" -> listOf("rosar")' in r
 assert 'if (token == "rosar")' in r
 assert "sendRouteInCurrentChat(route)" in s

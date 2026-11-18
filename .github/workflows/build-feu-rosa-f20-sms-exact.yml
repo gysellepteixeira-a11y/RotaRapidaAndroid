@@ -168,7 +168,7 @@ jobs:
           p.write_text(s.replace(old,'applicationIdSuffix = ".modalredfix.smsonly.immediate.f20fix"',1),encoding='utf-8')
           p=Path('app/src/main/res/values/strings.xml')
           s=p.read_text(encoding='utf-8')
-          old='Rota Rápida (TESTE MODAL 2)'
+          old='Rota Rápida (SMS OU WhatsApp)'
           if old not in s:
               raise SystemExit('Nome original inesperado')
           p.write_text(s.replace(old,'Rota Rápida (SMS FEU ROSA TESTE)',1),encoding='utf-8')

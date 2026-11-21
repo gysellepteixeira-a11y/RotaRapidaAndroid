@@ -50,7 +50,11 @@ extra='''            appendLine("ETAPAS OCR V67 | Poco x M52")
             )
             appendLine()
 '''
-s=once(s,report,extra+report,"image report")
+begin=s.index("    private fun idReport(route:RouteResult){")
+end=s.find("\n    private fun ",begin+20)
+if end<0: end=len(s)
+block=once(s[begin:end],report,extra+report,"image report")
+s=s[:begin]+block+s[end:]
 
 def method(name,following):
     start=s.index("    private fun "+name+"(")

@@ -259,4 +259,3 @@ s = s.replace(old_mark, new_mark, 1)
 
 S.write_text(s, encoding="utf-8")
 print("Patch aplicado com sucesso: otimização de fluxo de grupo fechado")
-''',file_path:

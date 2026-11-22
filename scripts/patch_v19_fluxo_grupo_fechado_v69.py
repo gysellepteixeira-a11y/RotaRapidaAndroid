@@ -174,7 +174,7 @@ s = s[:send_start] + send_block + s[send_end:]
 
 # 4. Capturar ready, polls, click e total sem depender de Prefs.setStatus removido pela V47
 w_start = s.find("    private fun waitForAdminUltraSendReady(")
-w_end = s.find("    private fun currentEditorText(", w_start)
+w_end = s.find("\n    private fun ", w_start + 1)
 if w_start < 0 or w_end < 0:
     sys.exit("Erro V69: limites de waitForAdminUltraSendReady nao encontrados.")
 

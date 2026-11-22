@@ -4,6 +4,21 @@ import sys
 S = Path("app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt")
 s = S.read_text(encoding="utf-8")
 
+# 0. Adicionar função auxiliar findMessageEditorFastV48
+if "findMessageEditorFastV48" not in s:
+    fast_editor_func = '''
+    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {
+        val items = collectNodeItems(root)
+        return items.filter { it.editable || it.className == "android.widget.EditText" }
+                    .maxByOrNull { it.rect.bottom }
+    }
+'''
+    pos = s.find("private fun findMessageEditor")
+    if pos != -1:
+        s = s[:pos] + fast_editor_func + s[pos:]
+    else:
+        sys.exit("Erro: não encontrei local para inserir findMessageEditorFastV48")
+
 # 1. Otimizar loop de espera sendRouteWhenChatReady
 old_loop = '''    private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {
         if (attempt >= 18) {

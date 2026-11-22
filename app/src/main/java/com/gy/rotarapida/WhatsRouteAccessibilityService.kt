@@ -26,12 +26,10 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         private const val WHATSAPP = "com.whatsapp"
         private const val WHATSAPP_BUSINESS = "com.whatsapp.w4b"
 
-        // Começamos conservador. Depois do primeiro teste no Poco F4
-        // podemos reduzir esse valor.
-        private const val IMAGE_OPEN_DELAY_MS = 140L
-
-        private const val IMAGE_RETRY_DELAY_MS = 180L
-        private const val SEND_BUTTON_DELAY_MS = 18L
+        // Ajustes finos para POCO F3 (Snapdragon 870)
+        private const val IMAGE_OPEN_DELAY_MS = 60L
+        private const val IMAGE_RETRY_DELAY_MS = 100L
+        private const val SEND_BUTTON_DELAY_MS = 10L
         private const val DEDUP_MS = 8_000L
     }
 
@@ -44,7 +42,9 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         val node: AccessibilityNodeInfo
     )
 
-    private val handler = Handler(Looper.getMainLooper())
+    private val handlerThread = HandlerThread("AccessibilityAnalysis").apply { start() }
+    private val backgroundHandler = Handler(handlerThread.looper)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val recognizer by lazy {
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     }
@@ -65,7 +65,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         Prefs.setStatus(this, "Serviço de acessibilidade conectado.")
         warmUpRecognizer()
-        handler.postDelayed({ primeCurrentScreen() }, 350)
+        backgroundHandler.postDelayed({ primeCurrentScreen() }, 200)
     }
 
     private fun warmUpRecognizer() {
@@ -92,7 +92,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         inspectImageHint(event)
 
         if (processing) return
-        scheduleAnalyze(12L)
+        scheduleAnalyze(8L)
     }
 
     override fun onInterrupt() {
@@ -100,6 +100,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        handlerThread.quitSafely()
         recognizer.close()
         super.onDestroy()
     }
@@ -108,7 +109,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         if (analyzeScheduled) return
         analyzeScheduled = true
 
-        handler.postDelayed({
+        backgroundHandler.postDelayed({
             analyzeScheduled = false
             analyzeCurrentWindow()
         }, delayMs)
@@ -1119,30 +1120,37 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         out: MutableList<NodeItem>,
         depth: Int
     ) {
-        if (depth > 80) return
+        if (depth > 20) return
 
         val rect = Rect()
         node.getBoundsInScreen(rect)
 
-        val mergedText = buildString {
-            node.text?.toString()?.takeIf { it.isNotBlank() }?.let {
-                append(it)
+        val className = node.className?.toString().orEmpty()
+        val isUseful = node.isClickable || node.isEditable || className.contains("Widget") || className.contains("View")
+
+        if (!isUseful && node.text.isNullOrBlank() && node.contentDescription.isNullOrBlank()) {
+             // Se não é clicável/editável e não tem texto, pula para os filhos
+        } else {
+            val mergedText = buildString {
+                node.text?.toString()?.takeIf { it.isNotBlank() }?.let {
+                    append(it)
+                }
+
+                node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let {
+                    if (isNotEmpty()) append(" | ")
+                    append(it)
+                }
             }
 
-            node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let {
-                if (isNotEmpty()) append(" | ")
-                append(it)
-            }
+            out += NodeItem(
+                text = mergedText,
+                rect = rect,
+                className = className,
+                clickable = node.isClickable,
+                editable = node.isEditable,
+                node = node
+            )
         }
-
-        out += NodeItem(
-            text = mergedText,
-            rect = rect,
-            className = node.className?.toString().orEmpty(),
-            clickable = node.isClickable,
-            editable = node.isEditable,
-            node = node
-        )
 
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue

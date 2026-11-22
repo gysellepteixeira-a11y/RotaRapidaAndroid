@@ -751,23 +751,28 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             return
         }
 
-        val items = collectNodeItems(root)
-        val group = Prefs.groupName(this)
+        // Diagnóstico: usando Fast Path em vez de collectNodeItems pesado
+        val fastEditor = findMessageEditorFastV48(root)
+        if (fastEditor == null) {
+            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
+            return
+        }
 
+        // Logando latencia exata do editor apareceu -> click
+        // Como o editor apareceu, vamos tentar enviar a rota
+        val group = Prefs.groupName(this)
+        // O isTargetGroup ainda requer coletar os itens para checar o nome do grupo
+        val items = collectNodeItems(root)
         if (!isTargetGroup(items, group)) {
             handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
             return
         }
 
-        if (findMessageEditor(items) == null) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        sendRouteInCurrentChat(route)
+        // Reutilizamos o node do fastEditor para enviar
+        sendRouteInCurrentChat(route, fastEditor.node)
     }
 
-    private fun sendRouteInCurrentChat(route: RouteResult) {
+    private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {
         if (isDuplicate(route)) {
             processing = false
             primeCurrentScreen()
@@ -781,8 +786,15 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             return
         }
 
-        val items = collectNodeItems(root)
-        val editor = findMessageEditor(items)
+        val editor = if (editorNode != null) {
+            // Criando NodeItem fake a partir do node encontrado pelo FastPath
+            val rect = Rect()
+            editorNode.getBoundsInScreen(rect)
+            NodeItem("", rect, "android.widget.EditText", false, true, editorNode)
+        } else {
+            val items = collectNodeItems(root)
+            findMessageEditor(items)
+        }
 
         if (editor == null) {
             processing = false
@@ -791,7 +803,6 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         }
 
         val message = buildMessage(route.cage)
-
         val args = Bundle().apply {
             putCharSequence(
                 AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
@@ -799,6 +810,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             )
         }
 
+        val clickStarted = SystemClock.elapsedRealtime()
         val setOk = editor.node.performAction(
             AccessibilityNodeInfo.ACTION_SET_TEXT,
             args
@@ -827,11 +839,12 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
                 return@postDelayed
             }
 
-            markSent(route)
+            val clickDuration = SystemClock.elapsedRealtime() - clickStarted
+            markSent(route, clickDuration)
         }, SEND_BUTTON_DELAY_MS)
     }
 
-    private fun markSent(route: RouteResult) {
+    private fun markSent(route: RouteResult, clickDuration: Long = -1L) {
         lastSentSignature = "${route.priorityIndex}:${route.cage}"
         lastSentAt = SystemClock.elapsedRealtime()
 
@@ -841,12 +854,12 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             -1L
         }
 
+        val log = if (elapsed >= 0) "app=${elapsed}ms" else ""
+        val clickLog = if (clickDuration >= 0) " | click=${clickDuration}ms" else ""
+
         Prefs.setStatus(
             this,
-            if (elapsed >= 0)
-                "ENVIADO: ${route.neighborhood} -> ${route.cage} | app=${elapsed}ms"
-            else
-                "ENVIADO: ${route.neighborhood} -> ${route.cage}"
+            "ENVIADO: ${route.neighborhood} -> ${route.cage} | $log$clickLog"
         )
 
         handler.postDelayed({

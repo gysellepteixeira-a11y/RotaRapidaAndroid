@@ -10,12 +10,12 @@ def run_patch():
     if not os.path.exists(S):
         print(f"Erro: Arquivo {S} não encontrado.")
         sys.exit(1)
-
+        
     with open(S, "r", encoding="utf-8") as f:
         content = f.read()
-
+    
     content = normalize_text(content)
-
+    
     # Adicionar findMessageEditorFastV48 se necessário
     if "private fun findMessageEditorFastV48" not in content:
         fast_editor_func = '''    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {
@@ -31,20 +31,12 @@ def run_patch():
             print("Erro crítico: função findMessageEditor não encontrada para âncora.")
             sys.exit(1)
 
-    # Regra 2b: Localizar usando âncoras e regex
-    # sendRouteWhenChatReady
-    # sendRouteInCurrentChat
-    # markSent
-
     # 1. Ajustar sendRouteWhenChatReady
-    # Regex para encontrar a função inteira e substituir
     loop_pattern = re.compile(r'private fun sendRouteWhenChatReady\(route: RouteResult, attempt: Int\) \{.*?\}', re.DOTALL)
     if not loop_pattern.search(content):
         print("Erro: função sendRouteWhenChatReady não encontrada.")
-        # Debug: imprimir trecho próximo
-        print(content[:1000])
         sys.exit(1)
-
+        
     new_loop = '''private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {
         if (attempt >= 18) {
             processing = false
@@ -79,10 +71,9 @@ def run_patch():
     # 2. Ajustar sendRouteInCurrentChat
     send_pattern = re.compile(r'private fun sendRouteInCurrentChat\(route: RouteResult\) \{.*?\}', re.DOTALL)
     if not send_pattern.search(content):
-        # Tenta com assinatura já alterada se rodar mais de uma vez, mas não deveria acontecer
         print("Erro: função sendRouteInCurrentChat original não encontrada.")
         sys.exit(1)
-
+        
     new_send = '''private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {
         if (isDuplicate(route)) {
             processing = false
@@ -154,13 +145,13 @@ def run_patch():
         }, SEND_BUTTON_DELAY_MS)
     }'''
     content = send_pattern.sub(new_send, content)
-
+    
     # 3. Ajustar markSent
     mark_pattern = re.compile(r'private fun markSent\(route: RouteResult\) \{.*?\}', re.DOTALL)
     if not mark_pattern.search(content):
         print("Erro: função markSent original não encontrada.")
         sys.exit(1)
-
+        
     new_mark = '''private fun markSent(route: RouteResult, clickDuration: Long = -1L) {
         lastSentSignature = "${route.priorityIndex}:${route.cage}"
         lastSentAt = SystemClock.elapsedRealtime()
@@ -185,13 +176,10 @@ def run_patch():
         }, 220L)
     }'''
     content = mark_pattern.sub(new_mark, content)
-
+    
     with open(S, "w", encoding="utf-8") as f:
         f.write(content)
     print("Patch aplicado com sucesso.")
 
 if __name__ == "__main__":
     run_patch()
-'''
-with open("scripts/patch_v19_fluxo_grupo_fechado_v69.py", "w", encoding="utf-8") as f:
-    f.write(content)

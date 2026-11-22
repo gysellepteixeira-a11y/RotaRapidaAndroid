@@ -2,184 +2,79 @@ import os
 import sys
 import re
 
-def normalize_text(text):
-    return text.replace('\r\n', '\n').strip()
+def get_balance(text):
+    return text.count('{') - text.count('}')
 
 def run_patch():
     S = "app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt"
-    if not os.path.exists(S):
-        print(f"Erro: Arquivo {S} não encontrado.")
-        sys.exit(1)
-        
     with open(S, "r", encoding="utf-8") as f:
         content = f.read()
     
-    content = normalize_text(content)
+    b_before = get_balance(content)
     
-    # Adicionar findMessageEditorFastV48 se necessário
+    # 0. Adicionar findMessageEditorFastV48
     if "private fun findMessageEditorFastV48" not in content:
-        fast_editor_func = '''    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {
-        val items = collectNodeItems(root)
-        return items.filter { it.editable || it.className == "android.widget.EditText" }
-                    .maxByOrNull { it.rect.bottom }
-    }'''
-        # Inserir antes de findMessageEditor
+        fast_editor_func = "\n    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {\n        val items = collectNodeItems(root)\n        return items.filter { it.editable || it.className == \"android.widget.EditText\" }\n                    .maxByOrNull { it.rect.bottom }\n    }\n"
         match = re.search(r'private fun findMessageEditor', content)
         if match:
-            content = content[:match.start()] + fast_editor_func + "\n\n" + content[match.start():]
+            content = content[:match.start()] + fast_editor_func + content[match.start():]
         else:
-            print("Erro crítico: função findMessageEditor não encontrada para âncora.")
-            sys.exit(1)
+            sys.exit("Erro: findMessageEditor não encontrado.")
 
     # 1. Ajustar sendRouteWhenChatReady
-    loop_pattern = re.compile(r'private fun sendRouteWhenChatReady\(route: RouteResult, attempt: Int\) \{.*?\}', re.DOTALL)
-    if not loop_pattern.search(content):
-        print("Erro: função sendRouteWhenChatReady não encontrada.")
-        sys.exit(1)
-        
-    new_loop = '''private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {
-        if (attempt >= 18) {
-            processing = false
-            Prefs.setStatus(this, "Voltei ao grupo, mas o campo de mensagem não apareceu.")
-            primeCurrentScreen()
-            return
-        }
-
-        val root = rootInActiveWindow
-        if (root == null) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        val fastEditor = findMessageEditorFastV48(root)
-        if (fastEditor == null) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        val group = Prefs.groupName(this)
-        val items = collectNodeItems(root)
-        if (!isTargetGroup(items, group)) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        sendRouteInCurrentChat(route, fastEditor.node)
-    }'''
-    content = loop_pattern.sub(new_loop, content)
+    m_loop = re.search(r'private fun sendRouteWhenChatReady\(route: RouteResult, attempt: Int\) \{', content)
+    if not m_loop: sys.exit("Erro: sendRouteWhenChatReady não encontrada.")
+    start = m_loop.start()
+    balance = 0
+    end = -1
+    for i in range(start, len(content)):
+        if content[i] == '{': balance += 1
+        elif content[i] == '}': balance -= 1
+        if balance == 0 and i > start:
+            end = i + 1
+            break
+            
+    new_loop = "private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {\n        if (attempt >= 18) {\n            processing = false\n            Prefs.setStatus(this, \"Voltei ao grupo, mas o campo de mensagem não apareceu.\")\n            primeCurrentScreen()\n            return\n        }\n\n        val root = rootInActiveWindow\n        if (root == null) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        val fastEditor = findMessageEditorFastV48(root)\n        if (fastEditor == null) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        val group = Prefs.groupName(this)\n        val items = collectNodeItems(root)\n        if (!isTargetGroup(items, group)) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        sendRouteInCurrentChat(route, fastEditor.node)\n    }"
+    content = content[:start] + new_loop + content[end:]
 
     # 2. Ajustar sendRouteInCurrentChat
-    send_pattern = re.compile(r'private fun sendRouteInCurrentChat\(route: RouteResult\) \{.*?\}', re.DOTALL)
-    if not send_pattern.search(content):
-        print("Erro: função sendRouteInCurrentChat original não encontrada.")
-        sys.exit(1)
-        
-    new_send = '''private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {
-        if (isDuplicate(route)) {
-            processing = false
-            primeCurrentScreen()
-            return
-        }
-
-        val root = rootInActiveWindow
-        if (root == null) {
-            processing = false
-            Prefs.setStatus(this, "Não encontrei a janela do WhatsApp para enviar.")
-            return
-        }
-
-        val editor = if (editorNode != null) {
-            val rect = Rect()
-            editorNode.getBoundsInScreen(rect)
-            NodeItem("", rect, "android.widget.EditText", false, true, editorNode)
-        } else {
-            val items = collectNodeItems(root)
-            findMessageEditor(items)
-        }
-
-        if (editor == null) {
-            processing = false
-            Prefs.setStatus(this, "Rota achada, mas não encontrei o campo de mensagem.")
-            return
-        }
-
-        val message = buildMessage(route.cage)
-        val args = Bundle().apply {
-            putCharSequence(
-                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                message
-            )
-        }
-
-        val clickStarted = SystemClock.elapsedRealtime()
-        val setOk = editor.node.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            args
-        )
-
-        if (!setOk) {
-            processing = false
-            Prefs.setStatus(this, "Rota achada, mas não consegui preencher a mensagem.")
-            return
-        }
-
-        handler.postDelayed({
-            val newRoot = rootInActiveWindow
-            if (newRoot == null) {
-                processing = false
-                Prefs.setStatus(this, "Mensagem preenchida, mas perdi a janela do WhatsApp.")
-                return@postDelayed
-            }
-
-            val newItems = collectNodeItems(newRoot)
-            val send = findSendButton(newItems)
-
-            if (send == null || !clickNodeOrParent(send.node)) {
-                processing = false
-                Prefs.setStatus(this, "Mensagem preenchida, mas não encontrei o botão Enviar.")
-                return@postDelayed
-            }
-
-            val clickDuration = SystemClock.elapsedRealtime() - clickStarted
-            markSent(route, clickDuration)
-        }, SEND_BUTTON_DELAY_MS)
-    }'''
-    content = send_pattern.sub(new_send, content)
+    m_send = re.search(r'private fun sendRouteInCurrentChat\(route: RouteResult\) \{', content)
+    if not m_send: sys.exit("Erro: sendRouteInCurrentChat original não encontrada.")
+    start = m_send.start()
+    balance = 0
+    end = -1
+    for i in range(start, len(content)):
+        if content[i] == '{': balance += 1
+        elif content[i] == '}': balance -= 1
+        if balance == 0 and i > start:
+            end = i + 1
+            break
+            
+    new_send = "private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {\n        if (isDuplicate(route)) {\n            processing = false\n            primeCurrentScreen()\n            return\n        }\n\n        val root = rootInActiveWindow\n        if (root == null) {\n            processing = false\n            Prefs.setStatus(this, \"Não encontrei a janela do WhatsApp para enviar.\")\n            return\n        }\n\n        val editor = if (editorNode != null) {\n            val rect = Rect()\n            editorNode.getBoundsInScreen(rect)\n            NodeItem(\"\", rect, \"android.widget.EditText\", false, true, editorNode)\n        } else {\n            val items = collectNodeItems(root)\n            findMessageEditor(items)\n        }\n\n        if (editor == null) {\n            processing = false\n            Prefs.setStatus(this, \"Rota achada, mas não encontrei o campo de mensagem.\")\n            return\n        }\n\n        val message = buildMessage(route.cage)\n        val args = Bundle().apply {\n            putCharSequence(\n                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,\n                message\n            )\n        }\n\n        val clickStarted = SystemClock.elapsedRealtime()\n        val setOk = editor.node.performAction(\n            AccessibilityNodeInfo.ACTION_SET_TEXT,\n            args\n        )\n\n        if (!setOk) {\n            processing = false\n            Prefs.setStatus(this, \"Rota achada, mas não consegui preencher a mensagem.\")\n            return\n        }\n\n        handler.postDelayed({\n            val newRoot = rootInActiveWindow\n            if (newRoot == null) {\n                processing = false\n                Prefs.setStatus(this, \"Mensagem preenchida, mas perdi a janela do WhatsApp.\")\n                return@postDelayed\n            }\n\n            val newItems = collectNodeItems(newRoot)\n            val send = findSendButton(newItems)\n\n            if (send == null || !clickNodeOrParent(send.node)) {\n                processing = false\n                Prefs.setStatus(this, \"Mensagem preenchida, mas não encontrei o botão Enviar.\")\n                return@postDelayed\n            }\n\n            val clickDuration = SystemClock.elapsedRealtime() - clickStarted\n            markSent(route, clickDuration)\n        }, SEND_BUTTON_DELAY_MS)\n    }"
+    content = content[:start] + new_send + content[end:]
     
     # 3. Ajustar markSent
-    mark_pattern = re.compile(r'private fun markSent\(route: RouteResult\) \{.*?\}', re.DOTALL)
-    if not mark_pattern.search(content):
-        print("Erro: função markSent original não encontrada.")
-        sys.exit(1)
-        
-    new_mark = '''private fun markSent(route: RouteResult, clickDuration: Long = -1L) {
-        lastSentSignature = "${route.priorityIndex}:${route.cage}"
-        lastSentAt = SystemClock.elapsedRealtime()
+    m_mark = re.search(r'private fun markSent\(route: RouteResult\) \{', content)
+    if not m_mark: sys.exit("Erro: markSent original não encontrada.")
+    start = m_mark.start()
+    balance = 0
+    end = -1
+    for i in range(start, len(content)):
+        if content[i] == '{': balance += 1
+        elif content[i] == '}': balance -= 1
+        if balance == 0 and i > start:
+            end = i + 1
+            break
 
-        val elapsed = if (currentStartedAt > 0L) {
-            SystemClock.elapsedRealtime() - currentStartedAt
-        } else {
-            -1L
-        }
-
-        val log = if (elapsed >= 0) "app=${elapsed}ms" else ""
-        val clickLog = if (clickDuration >= 0) " | click=${clickDuration}ms" else ""
-
-        Prefs.setStatus(
-            this,
-            "ENVIADO: ${route.neighborhood} -> ${route.cage} | $log$clickLog"
-        )
-
-        handler.postDelayed({
-            processing = false
-            primeCurrentScreen()
-        }, 220L)
-    }'''
-    content = mark_pattern.sub(new_mark, content)
+    new_mark = "private fun markSent(route: RouteResult, clickDuration: Long = -1L) {\n        lastSentSignature = \"${route.priorityIndex}:${route.cage}\"\n        lastSentAt = SystemClock.elapsedRealtime()\n\n        val elapsed = if (currentStartedAt > 0L) {\n            SystemClock.elapsedRealtime() - currentStartedAt\n        } else {\n            -1L\n        }\n\n        val log = if (elapsed >= 0) \"app=${elapsed}ms\" else \"\"\n        val clickLog = if (clickDuration >= 0) \" | click=${clickDuration}ms\" else \"\"\n\n        Prefs.setStatus(\n            this,\n            \"ENVIADO: ${route.neighborhood} -> ${route.cage} | $log$clickLog\"\n        )\n\n        handler.postDelayed({\n            processing = false\n            primeCurrentScreen()\n        }, 220L)\n    }"
+    content = content[:start] + new_mark + content[end:]
+    
+    b_after = get_balance(content)
+    if b_before != b_after:
+        sys.exit(f"Erro: Saldo de chaves incorreto! Antes: {b_before}, Depois: {b_after}")
     
     with open(S, "w", encoding="utf-8") as f:
         f.write(content)
     print("Patch aplicado com sucesso.")
 
-if __name__ == "__main__":
-    run_patch()
+run_patch()

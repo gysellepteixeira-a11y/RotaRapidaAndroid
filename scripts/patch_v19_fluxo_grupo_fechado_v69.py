@@ -1,64 +1,183 @@
-import os
+from pathlib import Path
 import sys
-import re
 
-def get_balance(text):
-    return text.count('{') - text.count('}')
+S = Path("app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt")
+if not S.exists():
+    sys.exit(f"Erro: {S} nao encontrado.")
 
-def run_patch():
-    S = "app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt"
-    if not os.path.exists(S):
-        sys.exit(f"Erro: {S} não encontrado.")
-    
-    with open(S, "r", encoding="utf-8") as f:
-        content = f.read()
-    
-    # 0. Inserir função auxiliar se não existir
-    if "private fun findMessageEditorFastV48" not in content:
-        fast_editor_func = "\n    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {\n        val items = collectNodeItems(root)\n        return items.filter { it.editable || it.className == \"android.widget.EditText\" }\n                    .maxByOrNull { it.rect.bottom }\n    }\n"
-        match = re.search(r'private fun findMessageEditor', content)
-        if match:
-            content = content[:match.start()] + fast_editor_func + content[match.start():]
-        else:
-            sys.exit("Erro: findMessageEditor não encontrado.")
+s = S.read_text(encoding="utf-8").replace("\r\n", "\n")
+balance_before = s.count("{") - s.count("}")
 
-    # 1. Substituir sendRouteWhenChatReady
-    # Regex robusto para capturar toda a função, ignorando espaços e quebras
-    pattern = re.compile(r'private fun sendRouteWhenChatReady\s*\(route: RouteResult, attempt: Int\)\s*\{.*?\}', re.DOTALL)
-    new_loop = "private fun sendRouteWhenChatReady(route: RouteResult, attempt: Int) {\n        if (attempt >= 18) {\n            processing = false\n            Prefs.setStatus(this, \"Voltei ao grupo, mas o campo de mensagem não apareceu.\")\n            primeCurrentScreen()\n            return\n        }\n\n        val root = rootInActiveWindow\n        if (root == null) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        val fastEditor = findMessageEditorFastV48(root)\n        if (fastEditor == null) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        val group = Prefs.groupName(this)\n        val items = collectNodeItems(root)\n        if (!isTargetGroup(items, group)) {\n            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)\n            return\n        }\n\n        sendRouteInCurrentChat(route, fastEditor.node)\n    }"
-    
-    if not pattern.search(content):
-        sys.exit("Erro: sendRouteWhenChatReady não encontrada para substituição.")
-    content = pattern.sub(new_loop, content)
-    
-    # 2. Substituir sendRouteInCurrentChat
-    pattern = re.compile(r'private fun sendRouteInCurrentChat\s*\(route: RouteResult\)\s*\{.*?\}', re.DOTALL)
-    new_send = "private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {\n        if (isDuplicate(route)) {\n            processing = false\n            primeCurrentScreen()\n            return\n        }\n\n        val root = rootInActiveWindow\n        if (root == null) {\n            processing = false\n            Prefs.setStatus(this, \"Não encontrei a janela do WhatsApp para enviar.\")\n            return\n        }\n\n        val editor = if (editorNode != null) {\n            val rect = Rect()\n            editorNode.getBoundsInScreen(rect)\n            NodeItem(\"\", rect, \"android.widget.EditText\", false, true, editorNode)\n        } else {\n            val items = collectNodeItems(root)\n            findMessageEditor(items)\n        }\n\n        if (editor == null) {\n            processing = false\n            Prefs.setStatus(this, \"Rota achada, mas não encontrei o campo de mensagem.\")\n            return\n        }\n\n        val message = buildMessage(route.cage)\n        val args = Bundle().apply {\n            putCharSequence(\n                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,\n                message\n            )\n        }\n\n        val clickStarted = SystemClock.elapsedRealtime()\n        val setOk = editor.node.performAction(\n            AccessibilityNodeInfo.ACTION_SET_TEXT,\n            args\n        )\n\n        if (!setOk) {\n            processing = false\n            Prefs.setStatus(this, \"Rota achada, mas não consegui preencher a mensagem.\")\n            return\n        }\n\n        handler.postDelayed({\n            val newRoot = rootInActiveWindow\n            if (newRoot == null) {\n                processing = false\n                Prefs.setStatus(this, \"Mensagem preenchida, mas perdi a janela do WhatsApp.\")\n                return@postDelayed\n            }\n\n            val newItems = collectNodeItems(newRoot)\n            val send = findSendButton(newItems)\n\n            if (send == null || !clickNodeOrParent(send.node)) {\n                processing = false\n                Prefs.setStatus(this, \"Mensagem preenchida, mas não encontrei o botão Enviar.\")\n                return@postDelayed\n            }\n\n            val clickDuration = SystemClock.elapsedRealtime() - clickStarted\n            markSent(route, clickDuration)\n        }, SEND_BUTTON_DELAY_MS)\n    }"
-    
-    if not pattern.search(content):
-        # Tenta a nova assinatura caso já tenha sido aplicada parcialmente
-        pattern = re.compile(r'private fun sendRouteInCurrentChat\s*\(route: RouteResult, editorNode: AccessibilityNodeInfo\?\s*=\s*null\)\s*\{.*?\}', re.DOTALL)
-        if not pattern.search(content):
-            sys.exit("Erro: sendRouteInCurrentChat não encontrada.")
-    content = pattern.sub(new_send, content)
+for req in [
+    "private fun findMessageEditorFastV48(",
+    "private fun trySendPendingRouteIfChatOpen(): Boolean {",
+    "private fun findAdminUltraSendNodeFast(",
+    "private fun waitForAdminUltraSendReady(",
+]:
+    if req not in s:
+        sys.exit(f"Erro V69: pre-requisito ausente no codigo pos-V68: {req}")
 
-    # 3. Substituir markSent
-    pattern = re.compile(r'private fun markSent\s*\(route: RouteResult\)\s*\{.*?\}', re.DOTALL)
-    new_mark = "private fun markSent(route: RouteResult, clickDuration: Long = -1L) {\n        lastSentSignature = \"${route.priorityIndex}:${route.cage}\"\n        lastSentAt = SystemClock.elapsedRealtime()\n\n        val elapsed = if (currentStartedAt > 0L) {\n            SystemClock.elapsedRealtime() - currentStartedAt\n        } else {\n            -1L\n        }\n\n        val log = if (elapsed >= 0) \"app=${elapsed}ms\" else \"\"\n        val clickLog = if (clickDuration >= 0) \" | click=${clickDuration}ms\" else \"\"\n\n        Prefs.setStatus(\n            this,\n            \"ENVIADO: ${route.neighborhood} -> ${route.cage} | $log$clickLog\"\n        )\n\n        handler.postDelayed({\n            processing = false\n            primeCurrentScreen()\n        }, 220L)\n    }"
-    
-    if not pattern.search(content):
-        pattern = re.compile(r'private fun markSent\s*\(route: RouteResult, clickDuration: Long\s*=\s*-1L\)\s*\{.*?\}', re.DOTALL)
-        if not pattern.search(content):
-             sys.exit("Erro: markSent não encontrada.")
-    content = pattern.sub(new_mark, content)
+# 1. Helper leve para detectar o editor no grupo fechado sem collectNodeItems
+pending_anchor = "    private fun trySendPendingRouteIfChatOpen(): Boolean {\n"
+pending_helper = '''    private var adminUltraEditorSeenAtV69: Long = 0L
+    private var adminUltraEditorLookupMsV69: Long = 0L
+    private var adminUltraEditorSourceV69: String = "v48"
 
-    # 4. Validação final
-    count = content.count("fun sendRouteWhenChatReady")
-    if count != 1:
-        sys.exit(f"Erro: Duplicação ou erro em sendRouteWhenChatReady. Contagem: {count}")
+    private fun findPendingEditorFastV69(root: AccessibilityNodeInfo): EditorFastHitV48? {
+        val lowerLimit = (resources.displayMetrics.heightPixels * 0.50f).toInt()
+        val viewIds = arrayOf("com.whatsapp:id/entry", "com.whatsapp.w4b:id/entry")
+        for (viewId in viewIds) {
+            val nodes: List<AccessibilityNodeInfo> = try {
+                root.findAccessibilityNodeInfosByViewId(viewId) ?: emptyList()
+            } catch (_: Throwable) {
+                emptyList()
+            }
+            for (node in nodes) {
+                val editable = try {
+                    node.isEditable || node.className?.toString() == "android.widget.EditText"
+                } catch (_: Throwable) {
+                    false
+                }
+                if (!editable) continue
+                val visible = try { node.isVisibleToUser } catch (_: Throwable) { true }
+                if (!visible) continue
+                val rect = Rect()
+                try { node.getBoundsInScreen(rect) } catch (_: Throwable) {}
+                if (!rect.isEmpty && rect.bottom >= lowerLimit) {
+                    adminUltraEditorSourceV69 = "id"
+                    return EditorFastHitV48(node, rect, 1)
+                }
+            }
+        }
+        val fast = findMessageEditorFastV48(root)
+        if (fast != null) {
+            adminUltraEditorSourceV69 = "bfs(${fast.visited})"
+            return fast
+        }
+        return null
+    }
 
-    with open(S, "w", encoding="utf-8") as f:
-        f.write(content)
-    print("Patch aplicado com sucesso.")
+'''
+if "private fun findPendingEditorFastV69(" not in s:
+    s = s.replace(pending_anchor, pending_helper + pending_anchor, 1)
 
-run_patch()
+# 2. Substituicao cirurgica APENAS da busca do editor dentro de trySendPendingRouteIfChatOpen
+p_start = s.find(pending_anchor)
+p_end = s.find("    private fun sendRouteInCurrentChat(", p_start)
+if p_start < 0 or p_end < 0:
+    sys.exit("Erro V69: limites de trySendPendingRouteIfChatOpen nao encontrados.")
+
+pending_block = s[p_start:p_end]
+old_lookup = '''        val root = rootInActiveWindow ?: return false
+        val items = collectNodeItems(root)
+        val editor = findMessageEditor(items) ?: return false
+
+        val releasedAt = SystemClock.elapsedRealtime()'''
+new_lookup = '''        val root = rootInActiveWindow ?: return false
+        val lookupStartedAtV69 = SystemClock.elapsedRealtime()
+        val editor = findPendingEditorFastV69(root) ?: return false
+
+        val releasedAt = SystemClock.elapsedRealtime()
+        adminUltraEditorSeenAtV69 = releasedAt
+        adminUltraEditorLookupMsV69 = releasedAt - lookupStartedAtV69'''
+
+if old_lookup not in pending_block:
+    print("--- TRECHO REAL DE trySendPendingRouteIfChatOpen ---")
+    print(pending_block[:1200])
+    sys.exit("Erro V69: bloco collectNodeItems dentro de trySendPendingRouteIfChatOpen nao encontrado.")
+
+pending_block = pending_block.replace(old_lookup, new_lookup, 1)
+s = s[:p_start] + pending_block + s[p_end:]
+
+# 3. Busca direta por viewId do botao Enviar antes da busca por texto em findAdminUltraSendNodeFast
+send_start = s.find("    private fun findAdminUltraSendNodeFast(")
+send_end = s.find("    private fun verifyAdminUltraFast(", send_start)
+if send_start < 0 or send_end < 0:
+    sys.exit("Erro V69: limites de findAdminUltraSendNodeFast nao encontrados.")
+
+send_block = s[send_start:send_end]
+queries_anchor = '        val queries = arrayOf("Enviar", "Send")\n'
+send_id_fast = '''        val sendIds = arrayOf("com.whatsapp:id/send", "com.whatsapp.w4b:id/send")
+        for (sendId in sendIds) {
+            val idNodes: List<AccessibilityNodeInfo> = try {
+                root.findAccessibilityNodeInfosByViewId(sendId) ?: emptyList()
+            } catch (_: Throwable) {
+                emptyList()
+            }
+            for (node in idNodes) {
+                val visible = try { node.isVisibleToUser } catch (_: Throwable) { true }
+                val enabled = try { node.isEnabled } catch (_: Throwable) { true }
+                if (!visible || !enabled) continue
+                val rect = Rect()
+                try { node.getBoundsInScreen(rect) } catch (_: Throwable) {}
+                if (rect.isEmpty) continue
+                val merged = buildString {
+                    node.text?.toString()?.let { append(it) }
+                    node.contentDescription?.toString()?.let {
+                        if (isNotEmpty()) append(' ')
+                        append(it)
+                    }
+                }
+                val n = RouteParser.normalize(merged)
+                val namedSend =
+                    n.isBlank() ||
+                    "enviar" in n ||
+                    n == "send" ||
+                    "send message" in n
+                if (
+                    namedSend &&
+                    rect.right >= (w * 0.78f).toInt() &&
+                    kotlin.math.abs(rect.centerY() - editorY) <= yTolerance
+                ) {
+                    return node
+                }
+            }
+        }
+
+'''
+if queries_anchor not in send_block:
+    print("--- TRECHO REAL DE findAdminUltraSendNodeFast ---")
+    print(send_block[:1200])
+    sys.exit("Erro V69: ancora queries em findAdminUltraSendNodeFast nao encontrada.")
+
+if "com.whatsapp:id/send" not in send_block:
+    send_block = send_block.replace(queries_anchor, send_id_fast + queries_anchor, 1)
+    s = s[:send_start] + send_block + s[send_end:]
+
+# 4. Log de latencia editor->click no clique direto do grupo fechado
+old_click_log = '''                val clickedAt = SystemClock.elapsedRealtime()
+                Prefs.setStatus(
+                    this,
+                    "ADMIN ULTRA DIRECT: Enviar pronto em ${waited}ms | polls=$poll | clique direto 1x"
+                )'''
+new_click_log = '''                val clickedAt = SystemClock.elapsedRealtime()
+                val editorToClickMsV69 = if (adminUltraEditorSeenAtV69 > 0L) {
+                    clickedAt - adminUltraEditorSeenAtV69
+                } else {
+                    waited
+                }
+                Prefs.setStatus(
+                    this,
+                    "ADMIN ULTRA V69: editor->click=${editorToClickMsV69}ms | ready=${waited}ms | lookup=${adminUltraEditorLookupMsV69}ms(${adminUltraEditorSourceV69}) | polls=$poll | clique direto 1x"
+                )'''
+if old_click_log in s:
+    s = s.replace(old_click_log, new_click_log, 1)
+else:
+    print("Aviso V69: status ADMIN ULTRA DIRECT diferente, mantendo status existente.")
+
+# 5. Validacoes de integridade estrutural
+balance_after = s.count("{") - s.count("}")
+if balance_after != balance_before:
+    sys.exit(f"Erro V69: saldo de chaves alterado ({balance_before} -> {balance_after}).")
+
+for fn in [
+    "fun trySendPendingRouteIfChatOpen(",
+    "fun waitForAdminUltraSendReady(",
+    "fun sendRouteWhenChatReady(",
+]:
+    cnt = s.count(fn)
+    if cnt != 1:
+        sys.exit(f"Erro V69: contagem inesperada para {fn}: {cnt}")
+
+S.write_text(s, encoding="utf-8")
+print("Patch V69 fluxo grupo fechado aplicado com sucesso (viewId + V48 fastpath + telemetria editor->click).")

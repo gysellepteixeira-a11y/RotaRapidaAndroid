@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/poco-text-photo-priority-v68
+      - otimizacao-poco-v68
   workflow_dispatch:
 
 jobs:

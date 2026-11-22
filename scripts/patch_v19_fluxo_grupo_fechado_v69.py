@@ -99,11 +99,14 @@ if old_lookup not in pending_block:
     sys.exit("Erro V69: bloco collectNodeItems dentro de trySendPendingRouteIfChatOpen nao encontrado.")
 pending_block = pending_block.replace(old_lookup, new_lookup, 1)
 
-old_fill = "        val fillMs = SystemClock.elapsedRealtime() - releasedAt\n"
-new_fill = "        val fillMs = SystemClock.elapsedRealtime() - releasedAt\n        adminUltraFillMsV69 = fillMs\n"
-if old_fill not in pending_block:
-    sys.exit("Erro V69: linha fillMs em trySendPendingRouteIfChatOpen nao encontrada.")
-pending_block = pending_block.replace(old_fill, new_fill, 1)
+wait_call_anchor = "        waitForAdminUltraSendReady(\n"
+if pending_block.count(wait_call_anchor) != 1:
+    sys.exit(f"Erro V69: chamada waitForAdminUltraSendReady inesperada (count={pending_block.count(wait_call_anchor)}).")
+pending_block = pending_block.replace(
+    wait_call_anchor,
+    "        adminUltraFillMsV69 = SystemClock.elapsedRealtime() - releasedAt\n" + wait_call_anchor,
+    1,
+)
 
 s = s[:p_start] + pending_block + s[p_end:]
 
@@ -169,31 +172,46 @@ if "com.whatsapp:id/send" not in send_block:
     send_block = send_block.replace(queries_anchor, send_id_fast + queries_anchor, 1)
 s = s[:send_start] + send_block + s[send_end:]
 
-# 4. Capturar ready, polls, click e total no clique direto do grupo fechado
-old_click_block = '''            if (clickNodeOrParent(sendNode)) {
-                val clickedAt = SystemClock.elapsedRealtime()
-                Prefs.setStatus(
-                    this,
-                    "ADMIN ULTRA DIRECT: Enviar pronto em ${waited}ms | polls=$poll | clique direto 1x"
-                )'''
-new_click_block = '''            val clickStartV69 = SystemClock.elapsedRealtime()
-            if (clickNodeOrParent(sendNode)) {
-                val clickedAt = SystemClock.elapsedRealtime()
-                adminUltraReadyMsV69 = waited
-                adminUltraPollsV69 = poll
-                adminUltraClickActionMsV69 = clickedAt - clickStartV69
-                adminUltraTotalMsV69 = if (adminUltraCycleStartAtV69 > 0L) {
-                    clickedAt - adminUltraCycleStartAtV69
-                } else {
-                    waited + adminUltraClickActionMsV69
-                }
-                Prefs.setStatus(
-                    this,
-                    "ADMIN ULTRA V69: total=${adminUltraTotalMsV69}ms | lookup=${adminUltraEditorLookupMsV69}ms(${adminUltraEditorSourceV69}) | setText=${adminUltraFillMsV69}ms | ready=${waited}ms(${adminUltraSendSourceV69},p=$poll) | click=${adminUltraClickActionMsV69}ms"
-                )'''
-if old_click_block not in s:
-    sys.exit("Erro V69: bloco de clique em waitForAdminUltraSendReady nao encontrado.")
-s = s.replace(old_click_block, new_click_block, 1)
+# 4. Capturar ready, polls, click e total sem depender de Prefs.setStatus removido pela V47
+w_start = s.find("    private fun waitForAdminUltraSendReady(")
+w_end = s.find("    private fun currentEditorText(", w_start)
+if w_start < 0 or w_end < 0:
+    sys.exit("Erro V69: limites de waitForAdminUltraSendReady nao encontrados.")
+
+wait_block = s[w_start:w_end]
+click_sig = "if (clickNodeOrParent(sendNode)) {"
+if wait_block.count(click_sig) != 1:
+    sys.exit(f"Erro V69: clickNodeOrParent(sendNode) inesperado em waitForAdminUltraSendReady (count={wait_block.count(click_sig)}).")
+
+idx = wait_block.find(click_sig)
+line_start = wait_block.rfind("\n", 0, idx) + 1
+indent = wait_block[line_start:idx]
+if indent.strip():
+    sys.exit(f"Erro V69: prefixo inesperado antes de clickNodeOrParent(sendNode): {indent!r}")
+line_end = wait_block.find("\n", idx)
+if line_end < 0:
+    sys.exit("Erro V69: fim de linha de clickNodeOrParent(sendNode) nao encontrado.")
+
+injected_before = f"{indent}val clickStartV69 = SystemClock.elapsedRealtime()\n"
+injected_inside = (
+    f"{indent}    val clickedAtV69 = SystemClock.elapsedRealtime()\n"
+    f"{indent}    adminUltraReadyMsV69 = clickStartV69 - startedAt\n"
+    f"{indent}    adminUltraPollsV69 = poll\n"
+    f"{indent}    adminUltraClickActionMsV69 = clickedAtV69 - clickStartV69\n"
+    f"{indent}    adminUltraTotalMsV69 = if (adminUltraCycleStartAtV69 > 0L) {{\n"
+    f"{indent}        clickedAtV69 - adminUltraCycleStartAtV69\n"
+    f"{indent}    }} else {{\n"
+    f"{indent}        clickedAtV69 - startedAt\n"
+    f"{indent}    }}\n"
+)
+wait_block = (
+    wait_block[:line_start]
+    + injected_before
+    + wait_block[line_start:line_end + 1]
+    + injected_inside
+    + wait_block[line_end + 1:]
+)
+s = s[:w_start] + wait_block + s[w_end:]
 
 # 5. Zerar contadores V69 ao iniciar um novo ciclo de diagnostico de imagem (idBegin)
 reset_anchor = "        idEditorFastV48=false; idEditorFallbackV48=false; idEditorVisitedV48=0; idEditorLookupMsV48=0L\n"
@@ -233,4 +251,4 @@ for fn in [
         sys.exit(f"Erro V69: contagem inesperada para {fn}: {cnt}")
 
 S.write_text(s, encoding="utf-8")
-print("Patch V69 aplicado com sucesso (fastpath grupo fechado + bloco V69 GRUPO FECHADO no relatorio final).")
+print("Patch V69 aplicado com sucesso (compativel com V47 clean fast + bloco V69 GRUPO FECHADO).")

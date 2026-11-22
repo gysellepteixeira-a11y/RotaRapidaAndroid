@@ -17,11 +17,18 @@ for req in [
     if req not in s:
         sys.exit(f"Erro V69: pre-requisito ausente no codigo pos-V68: {req}")
 
-# 1. Helper leve para detectar o editor no grupo fechado sem collectNodeItems
+# 1. Estado de telemetria + helper leve para detectar o editor no grupo fechado
 pending_anchor = "    private fun trySendPendingRouteIfChatOpen(): Boolean {\n"
-pending_helper = '''    private var adminUltraEditorSeenAtV69: Long = 0L
-    private var adminUltraEditorLookupMsV69: Long = 0L
-    private var adminUltraEditorSourceV69: String = "v48"
+pending_helper = '''    private var adminUltraUsedV69: Boolean = false
+    private var adminUltraCycleStartAtV69: Long = 0L
+    private var adminUltraEditorLookupMsV69: Long = -1L
+    private var adminUltraEditorSourceV69: String = "--"
+    private var adminUltraFillMsV69: Long = -1L
+    private var adminUltraSendSourceV69: String = "--"
+    private var adminUltraReadyMsV69: Long = -1L
+    private var adminUltraPollsV69: Int = -1
+    private var adminUltraClickActionMsV69: Long = -1L
+    private var adminUltraTotalMsV69: Long = -1L
 
     private fun findPendingEditorFastV69(root: AccessibilityNodeInfo): EditorFastHitV48? {
         val lowerLimit = (resources.displayMetrics.heightPixels * 0.50f).toInt()
@@ -61,7 +68,7 @@ pending_helper = '''    private var adminUltraEditorSeenAtV69: Long = 0L
 if "private fun findPendingEditorFastV69(" not in s:
     s = s.replace(pending_anchor, pending_helper + pending_anchor, 1)
 
-# 2. Substituicao cirurgica APENAS da busca do editor dentro de trySendPendingRouteIfChatOpen
+# 2. Substituicao cirurgica da busca do editor e medicao de setText em trySendPendingRouteIfChatOpen
 p_start = s.find(pending_anchor)
 p_end = s.find("    private fun sendRouteInCurrentChat(", p_start)
 if p_start < 0 or p_end < 0:
@@ -78,24 +85,44 @@ new_lookup = '''        val root = rootInActiveWindow ?: return false
         val editor = findPendingEditorFastV69(root) ?: return false
 
         val releasedAt = SystemClock.elapsedRealtime()
-        adminUltraEditorSeenAtV69 = releasedAt
-        adminUltraEditorLookupMsV69 = releasedAt - lookupStartedAtV69'''
+        adminUltraUsedV69 = true
+        adminUltraCycleStartAtV69 = lookupStartedAtV69
+        adminUltraEditorLookupMsV69 = releasedAt - lookupStartedAtV69
+        adminUltraFillMsV69 = -1L
+        adminUltraSendSourceV69 = "--"
+        adminUltraReadyMsV69 = -1L
+        adminUltraPollsV69 = -1
+        adminUltraClickActionMsV69 = -1L
+        adminUltraTotalMsV69 = -1L'''
 
 if old_lookup not in pending_block:
-    print("--- TRECHO REAL DE trySendPendingRouteIfChatOpen ---")
-    print(pending_block[:1200])
     sys.exit("Erro V69: bloco collectNodeItems dentro de trySendPendingRouteIfChatOpen nao encontrado.")
-
 pending_block = pending_block.replace(old_lookup, new_lookup, 1)
+
+old_fill = "        val fillMs = SystemClock.elapsedRealtime() - releasedAt\n"
+new_fill = "        val fillMs = SystemClock.elapsedRealtime() - releasedAt\n        adminUltraFillMsV69 = fillMs\n"
+if old_fill not in pending_block:
+    sys.exit("Erro V69: linha fillMs em trySendPendingRouteIfChatOpen nao encontrada.")
+pending_block = pending_block.replace(old_fill, new_fill, 1)
+
 s = s[:p_start] + pending_block + s[p_end:]
 
-# 3. Busca direta por viewId do botao Enviar antes da busca por texto em findAdminUltraSendNodeFast
+# 3. Busca direta por viewId do botao Enviar + registro da fonte (id vs text)
 send_start = s.find("    private fun findAdminUltraSendNodeFast(")
 send_end = s.find("    private fun verifyAdminUltraFast(", send_start)
 if send_start < 0 or send_end < 0:
     sys.exit("Erro V69: limites de findAdminUltraSendNodeFast nao encontrados.")
 
 send_block = s[send_start:send_end]
+text_return_anchor = "                    return node\n"
+if send_block.count(text_return_anchor) != 1:
+    sys.exit("Erro V69: retorno da busca textual em findAdminUltraSendNodeFast nao e unico.")
+send_block = send_block.replace(
+    text_return_anchor,
+    '                    adminUltraSendSourceV69 = "text"\n                    return node\n',
+    1,
+)
+
 queries_anchor = '        val queries = arrayOf("Enviar", "Send")\n'
 send_id_fast = '''        val sendIds = arrayOf("com.whatsapp:id/send", "com.whatsapp.w4b:id/send")
         for (sendId in sendIds) {
@@ -129,6 +156,7 @@ send_id_fast = '''        val sendIds = arrayOf("com.whatsapp:id/send", "com.wha
                     rect.right >= (w * 0.78f).toInt() &&
                     kotlin.math.abs(rect.centerY() - editorY) <= yTolerance
                 ) {
+                    adminUltraSendSourceV69 = "id"
                     return node
                 }
             }
@@ -136,36 +164,61 @@ send_id_fast = '''        val sendIds = arrayOf("com.whatsapp:id/send", "com.wha
 
 '''
 if queries_anchor not in send_block:
-    print("--- TRECHO REAL DE findAdminUltraSendNodeFast ---")
-    print(send_block[:1200])
     sys.exit("Erro V69: ancora queries em findAdminUltraSendNodeFast nao encontrada.")
-
 if "com.whatsapp:id/send" not in send_block:
     send_block = send_block.replace(queries_anchor, send_id_fast + queries_anchor, 1)
-    s = s[:send_start] + send_block + s[send_end:]
+s = s[:send_start] + send_block + s[send_end:]
 
-# 4. Log de latencia editor->click no clique direto do grupo fechado
-old_click_log = '''                val clickedAt = SystemClock.elapsedRealtime()
+# 4. Capturar ready, polls, click e total no clique direto do grupo fechado
+old_click_block = '''            if (clickNodeOrParent(sendNode)) {
+                val clickedAt = SystemClock.elapsedRealtime()
                 Prefs.setStatus(
                     this,
                     "ADMIN ULTRA DIRECT: Enviar pronto em ${waited}ms | polls=$poll | clique direto 1x"
                 )'''
-new_click_log = '''                val clickedAt = SystemClock.elapsedRealtime()
-                val editorToClickMsV69 = if (adminUltraEditorSeenAtV69 > 0L) {
-                    clickedAt - adminUltraEditorSeenAtV69
+new_click_block = '''            val clickStartV69 = SystemClock.elapsedRealtime()
+            if (clickNodeOrParent(sendNode)) {
+                val clickedAt = SystemClock.elapsedRealtime()
+                adminUltraReadyMsV69 = waited
+                adminUltraPollsV69 = poll
+                adminUltraClickActionMsV69 = clickedAt - clickStartV69
+                adminUltraTotalMsV69 = if (adminUltraCycleStartAtV69 > 0L) {
+                    clickedAt - adminUltraCycleStartAtV69
                 } else {
-                    waited
+                    waited + adminUltraClickActionMsV69
                 }
                 Prefs.setStatus(
                     this,
-                    "ADMIN ULTRA V69: editor->click=${editorToClickMsV69}ms | ready=${waited}ms | lookup=${adminUltraEditorLookupMsV69}ms(${adminUltraEditorSourceV69}) | polls=$poll | clique direto 1x"
+                    "ADMIN ULTRA V69: total=${adminUltraTotalMsV69}ms | lookup=${adminUltraEditorLookupMsV69}ms(${adminUltraEditorSourceV69}) | setText=${adminUltraFillMsV69}ms | ready=${waited}ms(${adminUltraSendSourceV69},p=$poll) | click=${adminUltraClickActionMsV69}ms"
                 )'''
-if old_click_log in s:
-    s = s.replace(old_click_log, new_click_log, 1)
-else:
-    print("Aviso V69: status ADMIN ULTRA DIRECT diferente, mantendo status existente.")
+if old_click_block not in s:
+    sys.exit("Erro V69: bloco de clique em waitForAdminUltraSendReady nao encontrado.")
+s = s.replace(old_click_block, new_click_block, 1)
 
-# 5. Validacoes de integridade estrutural
+# 5. Zerar contadores V69 ao iniciar um novo ciclo de diagnostico de imagem (idBegin)
+reset_anchor = "        idEditorFastV48=false; idEditorFallbackV48=false; idEditorVisitedV48=0; idEditorLookupMsV48=0L\n"
+reset_v69 = (
+    '        adminUltraUsedV69=false; adminUltraCycleStartAtV69=0L; adminUltraEditorLookupMsV69=-1L; '
+    'adminUltraEditorSourceV69="--"; adminUltraFillMsV69=-1L; adminUltraSendSourceV69="--"; '
+    'adminUltraReadyMsV69=-1L; adminUltraPollsV69=-1; adminUltraClickActionMsV69=-1L; adminUltraTotalMsV69=-1L\n'
+)
+if reset_anchor not in s:
+    sys.exit("Erro V69: ancora de reset V48 em idBegin nao encontrada.")
+s = s.replace(reset_anchor, reset_anchor + reset_v69, 1)
+
+# 6. Fixar a linha V69 GRUPO FECHADO no relatorio final logo apos V68 FOTO PRIORITARIA
+v68_anchor = '            appendLine("V68 FOTO PRIORITARIA | textoIgnorado=$photoSuppressedTextV68 | $photoEvidenceV68")\n'
+v69_report = '''            if (adminUltraUsedV69) {
+                appendLine("V69 GRUPO FECHADO | total=${adminUltraTotalMsV69}ms | lookup=${adminUltraEditorLookupMsV69}ms(${adminUltraEditorSourceV69}) | setText=${adminUltraFillMsV69}ms | ready=${adminUltraReadyMsV69}ms(${adminUltraSendSourceV69},polls=${adminUltraPollsV69}) | click=${adminUltraClickActionMsV69}ms")
+            } else {
+                appendLine("V69 GRUPO FECHADO | usado=false")
+            }
+'''
+if s.count(v68_anchor) != 1:
+    sys.exit(f"Erro V69: ancora V68 FOTO PRIORITARIA inesperada (count={s.count(v68_anchor)}).")
+s = s.replace(v68_anchor, v68_anchor + v69_report, 1)
+
+# 7. Validacoes de integridade estrutural
 balance_after = s.count("{") - s.count("}")
 if balance_after != balance_before:
     sys.exit(f"Erro V69: saldo de chaves alterado ({balance_before} -> {balance_after}).")
@@ -180,4 +233,4 @@ for fn in [
         sys.exit(f"Erro V69: contagem inesperada para {fn}: {cnt}")
 
 S.write_text(s, encoding="utf-8")
-print("Patch V69 fluxo grupo fechado aplicado com sucesso (viewId + V48 fastpath + telemetria editor->click).")
+print("Patch V69 aplicado com sucesso (fastpath grupo fechado + bloco V69 GRUPO FECHADO no relatorio final).")

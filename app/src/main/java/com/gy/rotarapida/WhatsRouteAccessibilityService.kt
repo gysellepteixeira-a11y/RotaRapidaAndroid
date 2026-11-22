@@ -751,28 +751,6 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
             return
         }
 
-        val fastEditor = findMessageEditorFastV48(root)
-        if (fastEditor == null) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        val group = Prefs.groupName(this)
-        val items = collectNodeItems(root)
-        if (!isTargetGroup(items, group)) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
-        sendRouteInCurrentChat(route, fastEditor.node)
-    }
-
-        val root = rootInActiveWindow
-        if (root == null) {
-            handler.postDelayed({ sendRouteWhenChatReady(route, attempt + 1) }, 25L)
-            return
-        }
-
         val items = collectNodeItems(root)
         val group = Prefs.groupName(this)
 
@@ -789,76 +767,12 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         sendRouteInCurrentChat(route)
     }
 
-    private fun sendRouteInCurrentChat(route: RouteResult, editorNode: AccessibilityNodeInfo? = null) {
+    private fun sendRouteInCurrentChat(route: RouteResult) {
         if (isDuplicate(route)) {
             processing = false
             primeCurrentScreen()
             return
         }
-
-        val root = rootInActiveWindow
-        if (root == null) {
-            processing = false
-            Prefs.setStatus(this, "Não encontrei a janela do WhatsApp para enviar.")
-            return
-        }
-
-        val editor = if (editorNode != null) {
-            val rect = Rect()
-            editorNode.getBoundsInScreen(rect)
-            NodeItem("", rect, "android.widget.EditText", false, true, editorNode)
-        } else {
-            val items = collectNodeItems(root)
-            findMessageEditor(items)
-        }
-
-        if (editor == null) {
-            processing = false
-            Prefs.setStatus(this, "Rota achada, mas não encontrei o campo de mensagem.")
-            return
-        }
-
-        val message = buildMessage(route.cage)
-        val args = Bundle().apply {
-            putCharSequence(
-                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                message
-            )
-        }
-
-        val clickStarted = SystemClock.elapsedRealtime()
-        val setOk = editor.node.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            args
-        )
-
-        if (!setOk) {
-            processing = false
-            Prefs.setStatus(this, "Rota achada, mas não consegui preencher a mensagem.")
-            return
-        }
-
-        handler.postDelayed({
-            val newRoot = rootInActiveWindow
-            if (newRoot == null) {
-                processing = false
-                Prefs.setStatus(this, "Mensagem preenchida, mas perdi a janela do WhatsApp.")
-                return@postDelayed
-            }
-
-            val newItems = collectNodeItems(newRoot)
-            val send = findSendButton(newItems)
-
-            if (send == null || !clickNodeOrParent(send.node)) {
-                processing = false
-                Prefs.setStatus(this, "Mensagem preenchida, mas não encontrei o botão Enviar.")
-                return@postDelayed
-            }
-
-            val clickDuration = SystemClock.elapsedRealtime() - clickStarted
-            markSent(route, clickDuration)
-        }, SEND_BUTTON_DELAY_MS)
-    }
 
         val root = rootInActiveWindow
         if (root == null) {
@@ -917,29 +831,8 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         }, SEND_BUTTON_DELAY_MS)
     }
 
-    private fun markSent(route: RouteResult, clickDuration: Long = -1L) {
+    private fun markSent(route: RouteResult) {
         lastSentSignature = "${route.priorityIndex}:${route.cage}"
-        lastSentAt = SystemClock.elapsedRealtime()
-
-        val elapsed = if (currentStartedAt > 0L) {
-            SystemClock.elapsedRealtime() - currentStartedAt
-        } else {
-            -1L
-        }
-
-        val log = if (elapsed >= 0) "app=${elapsed}ms" else ""
-        val clickLog = if (clickDuration >= 0) " | click=${clickDuration}ms" else ""
-
-        Prefs.setStatus(
-            this,
-            "ENVIADO: ${route.neighborhood} -> ${route.cage} | $log$clickLog"
-        )
-
-        handler.postDelayed({
-            processing = false
-            primeCurrentScreen()
-        }, 220L)
-    }:${route.cage}"
         lastSentAt = SystemClock.elapsedRealtime()
 
         val elapsed = if (currentStartedAt > 0L) {
@@ -989,13 +882,7 @@ class WhatsRouteAccessibilityService : AccessibilityService() {
         }
     }
 
-    
-    private fun findMessageEditorFastV48(root: AccessibilityNodeInfo): NodeItem? {
-        val items = collectNodeItems(root)
-        return items.filter { it.editable || it.className == "android.widget.EditText" }
-                    .maxByOrNull { it.rect.bottom }
-    }
-private fun findMessageEditor(items: List<NodeItem>): NodeItem? =
+    private fun findMessageEditor(items: List<NodeItem>): NodeItem? =
         items
             .filter { item ->
                 item.editable ||

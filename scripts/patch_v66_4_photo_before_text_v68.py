@@ -26,9 +26,9 @@ one("        val tfNewItems = tfNewItemsReverse.asReversed()",
         // contain flattened captions that mix Rosário with another cage.
         val photoIncomingV68 = if (primed && tfNewItems.isNotEmpty()) {
             val hintV68 = SystemClock.elapsedRealtime() < imageHintUntil
-            val newNodesV68 = tfNewItems.map { it.node }.toSet()
-            val newVisualV68 = findImageCandidates(items).any {
-                image.node in newNodesV68 && imageFingerprint(image) !in previousImageFingerprints
+            val newItemsV68 = tfNewItems.toSet()
+            val newVisualV68 = findImageCandidates(items).any { image ->
+                image in newItemsV68 && imageFingerprint(image) !in previousImageFingerprints
             }
             if (hintV68 || newVisualV68) {
                 val last = tfNewItems.last()

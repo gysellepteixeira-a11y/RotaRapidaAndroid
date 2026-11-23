@@ -62,7 +62,7 @@ waiter=r'''    private fun waitForReadMoreDescV20(startedAt:Long,poll:Int,genera
 
         if(generation!=rmDescWaitActiveGenerationV21)return
         val now=SystemClock.elapsedRealtime()
-        if(now-startedAt<450L){
+        if(now-startedAt<250L){
             handler.postDelayed({waitForReadMoreDescV20(startedAt,poll+1,generation)},5L)
             return
         }

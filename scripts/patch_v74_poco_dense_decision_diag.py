@@ -101,10 +101,6 @@ b=once(b,'        if (detected.rowCount < DENSE_MIN_ROWS) {\n',
 '''        if (detected.rowCount < DENSE_MIN_ROWS) {
             v74DenseWhy="POUCAS_LINHAS_" + detected.rowCount + "_MIN_" + DENSE_MIN_ROWS
 ''',"row guard")
-b=once(b,'        var crop = detected.bitmap\n',
-'''        v74DenseWhy="DENSO_APROVADO_" + detected.rowCount + "_LINHAS"
-        var crop = detected.bitmap
-''',"dense approved")
 s=s[:b0]+b+s[b1:]
 
 fb0=s.index('    private fun readDenseFullFallback(')

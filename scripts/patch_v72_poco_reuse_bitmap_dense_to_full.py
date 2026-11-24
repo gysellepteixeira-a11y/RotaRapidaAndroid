@@ -91,10 +91,16 @@ s=s[:dense_begin]+dense+s[dense_end:]
 # Report after local send to compare V71 to V72 without affecting latency.
 report_anchor='''            appendLine("RESUMO")
 '''
-s=one(s, report_anchor,
+report_begin=s.index("    private fun idReport(route:RouteResult){")
+report_end=s.find("\n    private fun ",report_begin+20)
+if report_begin<0: raise RuntimeError("V72 idReport not found")
+if report_end<0: report_end=len(s)
+report_block=s[report_begin:report_end]
+report_block=one(report_block, report_anchor,
     '''            appendLine("V72 REUSO BITMAP | ativado=$v72ReusedBitmap | caminho=DENSE_CHECK>FULL quando sem tabela densa")
 '''+report_anchor,
     "image diagnostic report")
+s=s[:report_begin]+report_block+s[report_end:]
 
 for marker in (
     "fun hasExactNativeRouteProofV70(", "V71 SISTEMA APOS ENVIO",

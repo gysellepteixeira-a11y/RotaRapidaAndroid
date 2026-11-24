@@ -302,7 +302,7 @@ jobs:
           assert 'bestHits >= maxOf(36, minColumnHits * 2)' in s
           assert 'v76LeftNarrow && rowCount < 12' in s
           assert 'v76LeftShiftAccepted && agencyRatio in 0.365f..0.42f' in s
-          assert '(widthRatio < 0.48f && !v76LeftNarrow)' in s
+          assert '(widthRatio < 0.42f && !v76LeftNarrow)' in s
           assert 'return v74RejectDense("AGENCIA_FORA_FAIXA")' in s
           assert 'readMediaOriginalFull(media)' in s
           assert 'showFloatingToggleV52()' in s

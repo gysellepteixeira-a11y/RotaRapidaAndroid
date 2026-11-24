@@ -80,11 +80,11 @@ d=d.replace(old_gate,new_gate,1)
 
 # Horizontal crop width check needs the SAME narrow-left exception; otherwise
 # the 39% crop will be rejected even after accepting the candidate.
-width_anchor='''if (widthRatio > 0.90f || widthRatio < 0.48f) return v74RejectDense("RECORTE_HORIZONTAL_INVALIDO")'''
+width_anchor='''if (widthRatio > 0.90f || widthRatio < 0.42f) return v74RejectDense("RECORTE_HORIZONTAL_INVALIDO")'''
 if width_anchor not in d:
     raise RuntimeError("V76 horizontal crop guard unexpectedly different")
 width_new='''if (widthRatio > 0.90f ||
-            (widthRatio < 0.48f && !v76LeftNarrow) ||
+            (widthRatio < 0.42f && !v76LeftNarrow) ||
             (v76LeftNarrow && widthRatio < 0.375f)
         ) return v74RejectDense("RECORTE_HORIZONTAL_INVALIDO")'''
 d=once(d,width_anchor,width_new,"horizontal crop gate")

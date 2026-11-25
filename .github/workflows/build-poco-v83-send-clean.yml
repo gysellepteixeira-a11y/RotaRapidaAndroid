@@ -1,0 +1,372 @@
+name: Poco V83 - send clean
+
+on:
+  push:
+    branches:
+      - experiment/poco-v83-send-clean
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Reproduzir base TEXT v18 + IMAGE v9
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          p=Path('.github/workflows/build-text-read-more-expanded-v16.yml')
+          text=p.read_text(encoding='utf-8')
+          scripts=re.findall(r'run:\s+python3\s+(scripts/[^\s]+\.py)', text)
+          if not scripts:
+              raise SystemExit('Nenhum patch da base v18 encontrado')
+          if scripts[-1] != 'scripts/patch_v19_text_read_more_strict_v18.py':
+              raise SystemExit('Base v18 inesperada: ultimo patch='+scripts[-1])
+          for script in scripts:
+              print('>>>', script, flush=True)
+              subprocess.run(['python3', script], check=True)
+          PY
+
+      - name: Esperar no real Ler mais sem gestos v20
+        run: python3 scripts/patch_v19_text_read_more_desc_wait_v20.py
+
+      - name: Invalidar callbacks antigos do DESC WAIT v21
+        run: python3 scripts/patch_v19_text_read_more_desc_wait_token_v21.py
+
+      - name: Medir atraso do Handler v22
+        run: python3 scripts/patch_v19_text_schedule_diag_v22.py
+
+      - name: Medir custo da prova do Ler mais v23
+        run: python3 scripts/patch_v19_text_read_more_proof_diag_v23.py
+
+      - name: Pular prova imediata e usar primeira prova apos 6ms v24
+        run: python3 scripts/patch_v19_text_read_more_skip_immediate_proof_v24.py
+
+      - name: Medir trecho pos-proof ate rota v25
+        run: python3 scripts/patch_v19_text_post_proof_diag_v25.py
+
+      - name: Parse direto do texto ja validado pelo strict proof v26
+        run: python3 scripts/patch_v19_text_proof_direct_parse_v26.py
+
+      - name: Medir trecho pre-clique do Ler mais v27
+        run: python3 scripts/run_patch_v19_text_preclick_diag_v27_fixed.py
+
+      - name: Lazy admin check v29
+        run: python3 scripts/patch_v19_text_stage_split_v29.py
+
+      - name: Truncation before root scan v30
+        run: python3 scripts/patch_v19_text_trunc_before_root_v30.py
+
+      - name: Skip obsolete band v31
+        run: python3 scripts/patch_v19_text_skip_obsolete_band_v31.py
+
+      - name: Local anchor strict proof v33
+        run: python3 scripts/patch_v19_text_local_anchor_proof_v33.py
+
+      - name: Corrigir placement do reset v33
+        run: python3 scripts/fix_v33_reset_anchor.py
+
+      - name: Parser split diagnostic v34
+        run: python3 scripts/patch_v19_text_parser_split_diag_v34.py
+
+      - name: ASCII normalize fast v36
+        run: python3 scripts/patch_v19_text_ascii_normalize_fast_v36.py
+
+      - name: Admin closed read fix v37
+        run: python3 scripts/patch_v19_text_admin_closed_read_fix_v37.py
+
+      - name: Adicionar Mata da Praia e Republica v46
+        run: python3 scripts/patch_v19_add_mata_republica_v46.py
+
+      - name: Limpar caminho critico v47
+        run: python3 scripts/patch_v19_clean_fast_v47.py
+
+      - name: Editor fast path v48
+        run: python3 scripts/patch_v19_editor_fastpath_v48.py
+
+      - name: Diagnostico completo v51
+        run: python3 scripts/patch_v19_v48_full_diag_v51.py
+
+      - name: Botao flutuante ON OFF v52
+        run: python3 scripts/patch_v19_floating_toggle_v52.py
+
+      - name: Rearmar busca pelo botao flutuante v53
+        run: python3 scripts/patch_v19_floating_rearm_v53.py
+
+      - name: Estado/cor e controle do overlay v54
+        run: python3 scripts/patch_v19_floating_state_toggle_v54.py
+
+      - name: Bairros editaveis v55
+        run: python3 scripts/patch_v19_editable_neighborhoods_v55.py
+
+      - name: Mensagem editavel v56
+        run: python3 scripts/patch_v19_editable_message_v56.py
+
+      - name: Corrigir colisao de bairros v57
+        run: python3 scripts/patch_v19_neighborhood_collision_fix_v57.py
+
+      - name: Aceitar letras de gaiola A-Z v58
+        run: python3 scripts/patch_v19_cage_letters_v58.py
+
+      - name: OCR especial para imagem ultrafina v59
+        run: python3 scripts/patch_v19_ultrathin_image_v59.py
+
+      - name: OCR ultrafino em tiles v60
+        run: python3 scripts/patch_v19_ultrathin_tiled_v60.py
+
+      - name: Gaiola em maiuscula v61
+        run: python3 scripts/patch_v19_uppercase_cage_v61.py
+
+      - name: Crop Bairro ancorado na Agency v64
+        run: python3 scripts/patch_v19_agency_anchor_v64.py
+
+      - name: Crop Gaiola relativo a largura original v65
+        run: python3 scripts/patch_v19_cage_source_cap_v65.py
+
+      - name: Gaiola hibrida + OCR warm v66
+        run: python3 scripts/patch_v19_hybrid_cage_warm_v66.py
+
+      - name: Corrigir Rosario de Fatima v66.1
+        run: python3 scripts/patch_v19_rosario_fatima_fix_v66_1.py
+
+      - name: Rosario robusto contra quebra OCR v66.2
+        run: python3 scripts/patch_v19_rosario_robust_v66_2.py
+
+      - name: Rescue de prioridade Rosario v66.3
+        run: python3 scripts/patch_v19_rosario_priority_rescue_v66_3.py
+
+      - name: Rosario somente pelo nome v66.4
+        run: python3 scripts/patch_v19_rosario_only_v66_4.py
+
+      - name: Filtro de cor modal sem OCR adicional
+        run: python3 scripts/patch_modal_color_v66_4.py
+
+      - name: Corrigir Feu Rosa confundido com Rosario
+        run: python3 scripts/patch_v66_4_feu_rosa_row_guard.py
+
+      - name: Separar aplicativo de teste Rosario
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts')
+          s=p.read_text()
+          old='applicationIdSuffix = ".modalredfix"'
+          assert old in s
+          p.write_text(s.replace(old,'applicationIdSuffix = ".semsmsf20"',1))
+          p=Path('app/src/main/res/values/strings.xml')
+          s=p.read_text()
+          old='Rota Rápida (TESTE MODAL 2)'
+          assert old in s
+          p.write_text(s.replace(old,'Rota Rápida (SEM SMS)',1))
+          PY
+
+      - name: Verificar que a versao nao possui SMS
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          service = Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text(encoding='utf-8')
+          main = Path('app/src/main/java/com/gy/rotarapida/MainActivity.kt').read_text(encoding='utf-8')
+          layout = Path('app/src/main/res/layout/activity_main.xml').read_text(encoding='utf-8')
+          assert 'sendSmsOnlyV664' not in service
+          assert 'SmsRelay' not in service
+          assert 'smsEnabled' not in service
+          assert 'switchSms' not in main + layout
+          assert 'isFeuRosaRowV684' in service
+          assert 'switchIncludeFake' in layout
+          print('Sem recursos SMS, com filtro de modalidades e protecao Feu Rosa')
+          PY
+
+      - name: Injetar contadores de etapas da imagem
+        run: python3 scripts/patch_v66_4_poco_stage_trace_v67.py
+
+      - name: Identidade separada do bot para diagnostico
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts')
+          s=p.read_text(encoding='utf-8')
+          old='applicationIdSuffix = ".semsmsf20"'
+          assert old in s
+          p.write_text(s.replace(old,'applicationIdSuffix = ".pococleanv83"',1),encoding='utf-8')
+          p=Path('app/src/main/res/values/strings.xml')
+          s=p.read_text(encoding='utf-8')
+          old='Rota Rápida (SEM SMS)'
+          assert old in s
+          p.write_text(s.replace(old,'Rota Rápida (POCO CLEAN V83)',1),encoding='utf-8')
+          PY
+
+      - name: Evitar escolha de texto quando imagem nova chegou
+        run: python3 scripts/patch_v66_4_photo_before_text_v68.py
+
+      - name: Otimizar fluxo de grupo fechado
+        run: python3 scripts/patch_v19_fluxo_grupo_fechado_v69.py
+
+      - name: Bloquear rotas fantasmas apenas no fluxo textual
+        run: python3 scripts/patch_v70_poco_rota_fantasma_text_only.py
+
+      - name: Verificar que o OCR e o grupo fechado continuam inalterados
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text()
+          assert s.count('hasExactNativeRouteProofV70(')==3
+          assert 'V69 GRUPO FECHADO |' in s
+          assert 'photoIncomingV68' in s
+          assert 'ModalFilter.filter(' in s
+          assert 'isFeuRosaRowV684' in s
+          assert 'sendSmsOnlyV664(' not in s
+          print('Verificacoes de regressao estaticas OK')
+          PY
+
+      - name: Acrescentar telemetria de sistema apenas ao relatorio final
+        run: python3 scripts/patch_v71_poco_ocr_system_diagnostics.py
+
+      - name: Confirmar que so foi adicionado diagnostico de pos-envio
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text()
+          assert s.count('perfSystemSnapshotV71()')==2
+          assert 'V71 SISTEMA APOS ENVIO' in s
+          assert 'fun hasExactNativeRouteProofV70(' in s
+          assert 'V69 GRUPO FECHADO |' in s
+          assert 'ModalFilter.filter(' in s
+          assert 'sendSmsOnlyV664(' not in s
+          print('V71 instrumentation only and prior protections preserved')
+          PY
+
+      - name: Diagnosticar motivos da decisao entre BAIRRO FIRST e FULL
+        run: python3 scripts/patch_v74_poco_dense_decision_diag.py
+
+      - name: Verificar protecoes e prioridades da V74
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text()
+          p=Path('app/src/main/java/com/gy/rotarapida/Prefs.kt').read_text()
+          r=Path('app/src/main/java/com/gy/rotarapida/RouteParser.kt').read_text()
+          assert 'V74 DETECTOR |' in s
+          assert 'v74RejectDense(' in s
+          assert 'DENSE_MIN_ROWS' in s
+          assert 'V71 SISTEMA APOS ENVIO' in s
+          assert 'V69 GRUPO FECHADO |' in s
+          assert 'showFloatingToggleV52()' in s
+          assert 'hasExactNativeRouteProofV70(' in s
+          assert 'ModalFilter.filter(' in s
+          assert 'isFeuRosaRowV684' in s
+          assert 'sendSmsOnlyV664(' not in s
+          assert 'fun setNeighborhoods(' in p
+          assert 'fun configurePriorities(' in r
+          print('V74 detector diagnostic only; overlays and prior protections preserved')
+          PY
+
+      - name: Registrar a coluna original e outras faixas de cor sem mudar OCR
+        run: python3 scripts/patch_v75_agency_rival_shadow.py
+
+      - name: Verificar que a segunda validacao e apenas diagnostica
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text(encoding='utf-8')
+          assert 'V75 AGENCIA CANDIDATA |' in s
+          assert 'V74 DETECTOR |' in s
+          assert 'v75OriginalAgencyRatio=agencyRatio' in s
+          assert s.count('v75InspectRivalAgencyBand(')==2
+          assert 'return v74RejectDense("AGENCIA_FORA_FAIXA")' in s
+          assert 'decisaoOCR=V74_SEM_ALTERACAO' in s
+          assert 'showFloatingToggleV52()' in s
+          assert 'V71 SISTEMA APOS ENVIO' in s
+          assert 'V69 GRUPO FECHADO |' in s
+          assert 'isFeuRosaRowV684' in s
+          assert 'ModalFilter.filter(' in s
+          assert 'hasExactNativeRouteProofV70(' in s
+          assert 'sendSmsOnlyV664(' not in s
+          print('V75 safe: shadow histogram inspection only; original OCR gate preserved')
+          PY
+
+      - name: Validar faixa da Agencia a esquerda e preservar fallback FULL
+        run: python3 scripts/patch_v76_guarded_agency_left.py
+
+      - name: Auditar geometria e protecoes da V76
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/java/com/gy/rotarapida/WhatsRouteAccessibilityService.kt').read_text()
+          assert 'V76 COLUNA ESQUERDA |' in s
+          assert 'V75 AGENCIA CANDIDATA |' in s
+          assert 'V74 DETECTOR |' in s
+          assert 'agencyRatio >= 0.365f && agencyRatio < 0.42f' in s
+          assert 'bestHits >= maxOf(36, minColumnHits * 2)' in s
+          assert 'v76LeftNarrow && rowCount < 12' in s
+          assert 'v76LeftShiftAccepted && agencyRatio in 0.365f..0.42f' in s
+          assert '(widthRatio < 0.42f && !v76LeftNarrow)' in s
+          assert 'return v74RejectDense("AGENCIA_FORA_FAIXA")' in s
+          assert 'readMediaOriginalFull(media)' in s
+          assert 'showFloatingToggleV52()' in s
+          assert 'V69 GRUPO FECHADO |' in s
+          assert 'isFeuRosaRowV684' in s
+          assert 'ModalFilter.filter(' in s
+          assert 'hasExactNativeRouteProofV70(' in s
+          assert 'sendSmsOnlyV664(' not in s
+          print('V76 guard conservative, fallback and protections present')
+          PY
+
+      - name: Aplicar experimento isolado V77
+        run: python3 scripts/patch_v77_short_table.py
+
+      - name: Aplicar perfil V78 sem alterar OCR ou envio
+        run: python3 scripts/patch_v78_stage_profile.py
+
+      - name: Aplicar V79 e testar equivalencia de normalizacao
+        run: python3 scripts/patch_v79_parser_fast.py
+
+      - name: Aplicar V80 OCR ultrafino unico com fallback
+        run: python3 scripts/patch_v80_ultrathin_single.py
+
+      - name: Aplicar V81 ampliacao ultrafina e buffer scan
+        run: python3 scripts/patch_v81_thin_scan.py
+
+      - name: Aplicar V83 decode FD e restaurar envio direto
+        run: python3 scripts/patch_v83_send_clean.py
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Instalar Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Configurar Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Habilitar teste JVM das prioridades
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle.kts')
+          s=p.read_text()
+          assert s.count('dependencies {')==1
+          p.write_text(s.replace('dependencies {', 'dependencies {\n    testImplementation("junit:junit:4.13.2")',1))
+          PY
+
+      - name: Testar prioridades e compilar APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --stacktrace
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RotaRapida-POCO-F3-V83-CLEAN
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+

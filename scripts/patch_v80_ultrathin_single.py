@@ -61,9 +61,13 @@ s=once(s,"        v79MatchRequests=0\n",'''        v80ThinMode="NOT_USED"
         v79MatchRequests=0
 ''')
 s=once(s,' | ultrafina=V78_3_TILES")',' | ultrafina="+v80ThinMode)')
-s=once(s,'            appendLine("RESUMO")\n','''            appendLine("V80 ULTRAFINA | modo="+v80ThinMode+" | OCRsingle="+v80SingleOcrMs+"ms | chamadasTotal="+v78ThinCalls+" | tilesPlanejados="+v78ThinTiles)
+reportStart=s.index("    private fun idReport(route:RouteResult){")
+reportEnd=s.index("\n    private fun ",reportStart+20)
+report=s[reportStart:reportEnd]
+report=once(report,'            appendLine("RESUMO")\n','''            appendLine("V80 ULTRAFINA | modo="+v80ThinMode+" | OCRsingle="+v80SingleOcrMs+"ms | chamadasTotal="+v78ThinCalls+" | tilesPlanejados="+v78ThinTiles)
             appendLine("RESUMO")
 ''')
+s=s[:reportStart]+report+s[reportEnd:]
 for marker in ["ModalFilter.filter(", "V79 PARSER FAST", "V78 PERFIL","V77 TABELA CURTA","V76 COLUNA ESQUERDA","hasExactNativeRouteProofV70(","isFeuRosaRowV684","readMediaEnhanced(media)"]:
     assert marker in s,marker
 assert "sendSmsOnlyV664(" not in s

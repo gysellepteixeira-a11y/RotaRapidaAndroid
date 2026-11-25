@@ -16,8 +16,18 @@ for name in ["readMediaLargeColorCrop","readMediaUltraThinV59"]:
     old='''contentResolver.openInputStream(media.uri)?.use { stream ->
                 BitmapFactory.decodeStream(stream)
             }'''
+    new="decodeMediaV82(media)"
+    if name=="readMediaUltraThinV59":
+        old='''contentResolver.openInputStream(media.uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream)?.let { original ->
+                    ModalFilter.filter(original, original, 0, Prefs.includeFake(this))
+                }
+            }'''
+        new='''decodeMediaV82(media)?.let { original ->
+                ModalFilter.filter(original, original, 0, Prefs.includeFake(this))
+            }'''
     assert t.count(old)==1,(name,t.count(old))
-    t=t.replace(old,"decodeMediaV82(media)",1)
+    t=t.replace(old,new,1)
     s=s[:a]+t+s[b:]
 a=s.index("    private fun readMediaUltraThinV59(")
 s=s[:a]+'''    private fun decodeMediaV82(media: MediaImage): Bitmap? {
